@@ -1,0 +1,39 @@
+[package]
+name = "signet-orders"
+version = "0.1.0"
+description = "signet orders examples"
+edition = "2024"
+rust-version = "1.85"
+authors = ["init4"]
+license = "Apache-2.0 OR MIT"
+homepage = "https://github.com/init4tech/signet-orders"
+repository = "https://github.com/init4tech/signet-orders"
+
+[lib]
+name = "orders"
+
+[[bin]]
+name = "order-roundtrip-example"
+path = "bin/roundtrip.rs"
+
+[dependencies]
+init4-bin-base = { version = "0.4.2", features = ["alloy"] }
+signet-constants =  { version = "0.2.0" }
+signet-zenith =  { version = "0.2.0" }
+signet-types =  { version = "0.2.0" }
+signet-tx-cache =  { version = "0.2.0" }
+signet-bundle =  { version = "0.2.0" }
+
+alloy = { version = "1.0.5", features = [
+    "full",
+    "json-rpc",
+    "signer-aws",
+    "rpc-types-mev",
+    "rlp",
+    "node-bindings",
+    "serde",
+] }
+
+tokio = { version = "1.36.0", features = ["full", "macros", "rt-multi-thread"] }
+chrono = "0.4.38"
+eyre = "0.6.12"
