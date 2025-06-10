@@ -23,9 +23,16 @@ where
 {
     /// Create a new SendOrder instance.
     pub fn new(signer: S, constants: SignetConstants) -> Result<Self, Error> {
+        let tx_cache_url = constants
+            .environment()
+            .transaction_cache()
+            .strip_prefix("https://")
+            .map(|s| format!("http://{s}:8080"))
+            .unwrap();
+        debug!(tx_cache_url, "Connecting to transaction cache");
         Ok(Self {
             signer,
-            tx_cache: TxCache::new_from_string(constants.environment().transaction_cache())?,
+            tx_cache: TxCache::new_from_string(&tx_cache_url)?,
             constants,
         })
     }
