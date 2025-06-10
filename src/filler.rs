@@ -8,7 +8,10 @@ use alloy::{
     signers::Signer,
 };
 use eyre::{Error, eyre};
-use init4_bin_base::utils::{from_env::FromEnv, signer::LocalOrAwsConfig};
+use init4_bin_base::{
+    deps::tracing::{debug, trace},
+    utils::{from_env::FromEnv, signer::LocalOrAwsConfig},
+};
 use signet_bundle::SignetEthBundle;
 use signet_constants::SignetConstants;
 use signet_tx_cache::{client::TxCache, types::TxCacheSendBundleResponse};
@@ -81,6 +84,8 @@ where
     /// Order `initiate` transactions will revert if the Order has already been filled,
     /// in which case the entire Bundle would simply be discarded by the Builder.
     pub async fn fill_individually(&self, orders: &[SignedOrder]) -> Result<(), Error> {
+        debug!(orders_count = orders.len(), "Filling orders individually");
+
         // submit one bundle per individual order
         for order in orders {
             self.fill(from_ref(order)).await?;
@@ -103,19 +108,24 @@ where
     /// Filling Orders individually ensures that even if some Orders are not fillable, others may still mine;
     /// however, it is less gas efficient.
     pub async fn fill(&self, orders: &[SignedOrder]) -> Result<TxCacheSendBundleResponse, Error> {
+        debug!(orders_count = orders.len(), "Filling orders in bundle");
+
         // if orders is empty, error out
         if orders.is_empty() {
             eyre::bail!("no orders to fill")
         }
 
         // sign a SignedFill for the orders
-        let mut signed_fills = self.sign_fills(orders).await?;
+        let mut signed_fills: HashMap<u64, SignedFill> = self.sign_fills(orders).await?;
+        trace!(?signed_fills, "Signed fills");
 
         // get the transaction requests for the rollup
         let tx_requests = self.rollup_txn_requests(&signed_fills, orders).await?;
+        trace!(?tx_requests, "Transaction requests");
 
         // sign & encode the transactions for the Bundle
         let txs = self.sign_and_encode_txns(tx_requests).await?;
+        trace!(?txs, "Encoded transactions");
 
         // get the aggregated host fill for the Bundle, if any
         let host_fills = signed_fills.remove(&self.constants.host().chain_id());
@@ -135,6 +145,7 @@ where
                 replacement_uuid: None, // optional if implementing strategies that replace or cancel bundles
             },
         };
+        debug!(?bundle, "Forwarding bundle to transaction cache");
 
         // submit the Bundle to the transaction cache
         self.tx_cache.forward_bundle(bundle).await

@@ -1,5 +1,6 @@
 use alloy::signers::Signer;
 use eyre::Error;
+use init4_bin_base::deps::tracing::{debug, trace};
 use signet_constants::SignetConstants;
 use signet_tx_cache::client::TxCache;
 use signet_types::{SignedOrder, UnsignedOrder};
@@ -37,6 +38,8 @@ where
 
     /// Sign an Order.
     pub async fn sign_order(&self, order: Order) -> Result<SignedOrder, Error> {
+        trace!(?order, "Signing order");
+
         // make an UnsignedOrder from the Order
         let unsigned = UnsignedOrder::from(&order);
 
@@ -54,6 +57,7 @@ where
     /// Forward a SignedOrder to the transaction cache.
     pub async fn send_order(&self, signed: SignedOrder) -> Result<(), Error> {
         // send the SignedOrder to the transaction cache
+        debug!(order = ?signed, "Forwarding signed order to transaction cache");
         self.tx_cache.forward_order(signed).await
     }
 }

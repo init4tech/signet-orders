@@ -3,7 +3,10 @@ use alloy::{
     signers::Signer,
 };
 use chrono::Utc;
-use init4_bin_base::utils::{from_env::FromEnv, signer::LocalOrAws};
+use init4_bin_base::{
+    deps::tracing::{debug, trace},
+    utils::{from_env::FromEnv, signer::LocalOrAws, tracing::init_tracing},
+};
 use orders::{
     filler::{Filler, FillerConfig},
     order::SendOrder,
@@ -18,10 +21,14 @@ const ONE_USDC: U256 = uint!(1_000_000_U256);
 /// Construct, sign, and send a Signet Order, then Fill the same Order.
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> eyre::Result<()> {
+    // initialize tracing
+    init_tracing();
+
     // load config from environment variables
     let config = FillerConfig::from_env()?;
 
     // connect signer and provider
+    trace!("Connecting signer and provider...");
     let signer = config.signer_config.connect().await?;
     let provider = connect_provider(signer.clone(), config.ru_rpc_url.clone()).await?;
 
@@ -80,6 +87,10 @@ async fn fill_orders(
 
     // get all SignedOrders from tx cache
     let orders: Vec<SignedOrder> = filler.get_orders().await?;
+    debug!(
+        order_count = orders.len(),
+        "Queried orders from transaction cache"
+    );
 
     // filter orders into a Vec<SignedOrder> of only orders that match the target order
     let fillable_orders: Vec<SignedOrder> =
