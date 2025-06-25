@@ -1,5 +1,5 @@
 use init4_bin_base::{
-    deps::tracing::trace,
+    deps::tracing::debug,
     utils::{from_env::FromEnv, tracing::init_tracing},
 };
 use orders::{bundle::BundleSender, filler::FillerConfig, provider::connect_provider};
@@ -14,7 +14,7 @@ async fn main() -> eyre::Result<()> {
     let config = FillerConfig::from_env()?;
 
     // connect signer and provider
-    trace!("Connecting signer and provider...");
+    debug!("Connecting signer and provider...");
     let signer = config.signer_config.connect().await?;
     let provider = connect_provider(signer.clone(), config.ru_rpc_url.clone()).await?;
 

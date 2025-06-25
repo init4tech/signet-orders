@@ -69,10 +69,15 @@ impl BundleSender {
                     replacement_uuid: None, // optional if implementing strategies that replace or cancel bundles
                 },
             };
+            debug!(
+                target_block_number = bundle.bundle.block_number,
+                "Sending bundle for block number to transaction cache"
+            );
 
             // submit the Bundle to the transaction cache
             self.tx_cache.forward_bundle(bundle).await?;
         }
+
         Ok(())
     }
 
