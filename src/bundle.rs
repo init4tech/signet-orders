@@ -58,24 +58,31 @@ impl BundleSender {
         // loop through `num_blocks` block numbers to ensure the Bundle lands in a block
         for i in 0..num_blocks {
             // construct a Bundle for the given block
+            let target_block_number = current_block_number + i;
             let bundle = SignetEthBundle {
                 host_fills: None, // no Host fills in this example
                 bundle: EthSendBundle {
                     txs: txs.clone(),
                     reverting_tx_hashes: vec![],
-                    block_number: current_block_number + i,
+                    block_number: target_block_number,
                     min_timestamp: None, // sufficiently covered by pinning to next block number
                     max_timestamp: None, // sufficiently covered by pinning to next block number
                     replacement_uuid: None, // optional if implementing strategies that replace or cancel bundles
                 },
             };
             debug!(
-                target_block_number = bundle.bundle.block_number,
+                target_block_number,
                 "Sending bundle for block number to transaction cache"
             );
 
             // submit the Bundle to the transaction cache
-            self.tx_cache.forward_bundle(bundle).await?;
+            let response = self.tx_cache.forward_bundle(bundle).await?;
+
+            debug!(
+                target_block_number,
+                bundle_id = ?response.id,
+                "Sent bundle to transaction cache"
+            );
         }
 
         Ok(())
