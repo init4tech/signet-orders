@@ -18,6 +18,9 @@ pub mod filler;
 /// Example to send Orders.
 pub mod order;
 
+/// Example to send dummy Bundles.
+pub mod bundle;
+
 /// Provider capable of filling and sending transactions.
 pub mod provider;
 
