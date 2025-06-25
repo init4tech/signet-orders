@@ -117,6 +117,11 @@ impl BundleSender {
                 eyre::bail!("Failed to fill transaction")
             };
 
+            debug!(
+                ?filled,
+                "Filled transaction ready for encoding"
+            );
+
             // encode it
             let encoded = filled.encoded_2718();
 
