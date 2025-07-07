@@ -2,9 +2,9 @@ use crate::provider::TxSenderProvider;
 use alloy::{
     eips::Encodable2718,
     network::TransactionBuilder,
-    primitives::{Address, Bytes, U256},
+    primitives::{address, Address, Bytes, U256},
     providers::{Provider, SendableTx, WalletProvider},
-    rpc::types::{TransactionRequest, mev::EthSendBundle},
+    rpc::types::{mev::EthSendBundle, TransactionRequest},
 };
 use eyre::Error;
 use init4_bin_base::deps::tracing::{debug, trace};
@@ -31,7 +31,7 @@ impl BundleSender {
             .environment()
             .transaction_cache()
             .strip_prefix("https://")
-            .map(|s| format!("http://{s}:8080"))
+            .map(|s| format!("http://localhost:8080"))
             .unwrap();
         debug!(tx_cache_url, "Connecting to transaction cache");
         Ok(Self {
@@ -93,7 +93,7 @@ impl BundleSender {
     async fn dummy_tx_request(&self) -> Result<Vec<TransactionRequest>, Error> {
         Ok(vec![
             TransactionRequest::default()
-                .with_to(Address::default())
+                .with_to(address!("0xbb9bc244d798123fde783fcc1c72d3bb8c189413"))
                 .with_value(U256::from(1)),
         ])
     }
@@ -107,6 +107,8 @@ impl BundleSender {
         let mut encoded_txs: Vec<Bytes> = Vec::new();
         for mut tx in tx_requests {
             // fill out the transaction fields
+            dbg!("address is this");
+            dbg!(self.ru_provider.default_signer_address());
             tx = tx
                 .with_from(self.ru_provider.default_signer_address())
                 .with_gas_limit(1_000_000)

@@ -21,14 +21,14 @@ name = "send-bundle-example"
 path = "bin/send-bundles.rs"
 
 [dependencies]
-init4-bin-base = { version = "0.4.2", features = ["alloy"] }
-signet-constants =  { version = "0.2.0" }
-signet-zenith =  { version = "0.2.0" }
-signet-types =  { version = "0.2.0" }
-signet-tx-cache =  { version = "0.2.0" }
-signet-bundle =  { version = "0.2.0" }
+init4-bin-base = { version = "0.6.0", features = ["alloy"] }
+signet-constants =  { version = "0.4.3" }
+signet-zenith =  { version = "0.4.3" }
+signet-types =  { version = "0.4.3" }
+signet-tx-cache =  { version = "0.4.3" }
+signet-bundle =  { version = "0.4.3" }
 
-alloy = { version = "1.0.5", features = [
+alloy = { version = "1.0.11", features = [
     "full",
     "json-rpc",
     "signer-aws",
@@ -38,6 +38,6 @@ alloy = { version = "1.0.5", features = [
     "serde",
 ] }
 
-tokio = { version = "1.36.0", features = ["full", "macros", "rt-multi-thread"] }
+tokio = { version = "1.46.1", features = ["full", "macros", "rt-multi-thread"] }
 chrono = "0.4.38"
 eyre = "0.6.12"
