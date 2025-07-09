@@ -95,7 +95,8 @@ where
 
         // submit one bundle per individual order
         for order in orders {
-            self.fill(from_ref(order)).await?;
+            let response = self.fill(from_ref(order)).await?;
+            debug!(bundle_id = response.id.to_string(), "Bundle sent to cache");
         }
 
         Ok(())
