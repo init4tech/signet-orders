@@ -170,10 +170,18 @@ where
     /// In this case, the Filler would wish to split up the Fills for each Order,
     /// rather than signing a single, aggregate a Fill for each chain, as is done here.
     async fn sign_fills(&self, orders: &[SignedOrder]) -> Result<HashMap<u64, SignedFill>, Error> {
+        let deadline = orders[0]
+            .permit
+            .permit
+            .deadline
+            .to_string()
+            .parse::<u64>()
+            .map_err(|_| eyre!("invalid deadline in orders"))?;
         //  create an AggregateOrder from the SignedOrders they want to fill
         let agg: AggregateOrders = orders.iter().collect();
         // produce an UnsignedFill from the AggregateOrder
         let mut unsigned_fill = UnsignedFill::from(&agg);
+        unsigned_fill = unsigned_fill.with_deadline(deadline);
         // populate the Order contract addresses for each chain
         for chain_id in agg.destination_chain_ids() {
             unsigned_fill = unsigned_fill.with_chain(

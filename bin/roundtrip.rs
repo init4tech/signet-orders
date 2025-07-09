@@ -44,7 +44,7 @@ async fn main() -> eyre::Result<()> {
             chainId: config.constants.host().chain_id() as u32,
             recipient: signer.address(),
         }],
-        deadline: U256::from(Utc::now().timestamp() + 60), // 60 seconds from now
+        deadline: U256::from(Utc::now().timestamp() + (60 * 10)), // 10 minutes from now
     };
 
     // sign & send the order to the transaction cache
