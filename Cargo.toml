@@ -16,6 +16,10 @@ name = "orders"
 name = "order-roundtrip-example"
 path = "bin/roundtrip.rs"
 
+[[bin]]
+name = "ru-order-roundtrip-example"
+path = "bin/ru_roundtrip.rs"
+
 [dependencies]
 init4-bin-base = { version = "0.8.0", features = ["alloy"] }
 signet-constants =  { version = "0.7.0" }
