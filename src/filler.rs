@@ -183,13 +183,16 @@ where
     /// rather than signing a single, aggregate a Fill for each chain, as is done here.
     #[instrument(skip(self, orders))]
     async fn sign_fills(&self, orders: &[SignedOrder]) -> Result<HashMap<u64, SignedFill>, Error> {
+        if orders.is_empty() {
+            eyre::bail!("no orders to fill");
+        }
         let deadline = orders[0]
             .permit
             .permit
             .deadline
             .to_string()
             .parse::<u64>()
-            .map_err(|_| eyre!("invalid deadline in orders"))?;
+            .map_err(|e| eyre!("invalid deadline in orders: {e}"))?;
         //  create an AggregateOrder from the SignedOrders they want to fill
         let agg: AggregateOrders = orders.iter().collect();
         debug!(?agg, "Aggregated orders for fill");
