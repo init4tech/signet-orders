@@ -31,7 +31,7 @@ pub struct FillerConfig {
     /// NOTE: For the example, this key must be funded with USDC on both the Host and Rollup, as well as gas on the Rollup.
     /// .env vars: SIGNER_KEY, SIGNER_CHAIN_ID
     pub signer_config: LocalOrAwsConfig,
-    /// The Signet Constants.
+    /// The Signet constants.
     /// .env var: CHAIN_NAME
     pub constants: SignetConstants,
 }
