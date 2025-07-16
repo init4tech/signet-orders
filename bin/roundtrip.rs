@@ -70,24 +70,23 @@ fn get_example_order(config: &FillerConfig, recipient: Address, rollup: bool) ->
                 amount: ONE_USDC,
             }],
             outputs: vec![Output {
-                token: config.constants.host().tokens().usdc(),
+                token: config.constants.rollup().tokens().usdc(),
                 amount: ONE_USDC,
-                chainId: config.constants.host().chain_id() as u32,
+                chainId: config.constants.rollup().chain_id() as u32,
                 recipient,
             }],
             deadline: U256::from(Utc::now().timestamp() + (60 * 10)), // 10 minutes from now
         }
     } else {
-        // create an example order swapping 1 host USDC for 1 host USDC
         Order {
             inputs: vec![Input {
                 token: config.constants.rollup().tokens().usdc(),
                 amount: ONE_USDC,
             }],
             outputs: vec![Output {
-                token: config.constants.rollup().tokens().usdc(),
+                token: config.constants.host().tokens().usdc(),
                 amount: ONE_USDC,
-                chainId: config.constants.rollup().chain_id() as u32,
+                chainId: config.constants.host().chain_id() as u32,
                 recipient,
             }],
             deadline: U256::from(Utc::now().timestamp() + (60 * 10)), // 10 minutes from now
