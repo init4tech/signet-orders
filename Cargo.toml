@@ -35,5 +35,6 @@ alloy = { version = "1.0.19", features = [
 ] }
 
 tokio = { version = "1.36.0", features = ["full", "macros", "rt-multi-thread"] }
+reqwest = { version = "0.12.22", features = ["rustls-tls-native-roots", "json"]}
 chrono = "0.4.38"
 eyre = "0.6.12"

@@ -23,16 +23,21 @@ where
 {
     /// Create a new SendOrder instance.
     pub fn new(signer: S, constants: SignetConstants) -> Result<Self, Error> {
-        let tx_cache_url = constants
-            .environment()
-            .transaction_cache()
-            .strip_prefix("https://")
-            .map(|s| format!("http://{s}:8080"))
+        let tx_cache_url: reqwest::Url =
+            constants.environment().transaction_cache().parse().unwrap();
+        let client = reqwest::ClientBuilder::new()
+            .use_rustls_tls()
+            .build()
             .unwrap();
-        debug!(tx_cache_url, "Connecting to transaction cache");
+
+        debug!(
+            tx_cache_url = tx_cache_url.as_str(),
+            "Connecting to transaction cache"
+        );
+
         Ok(Self {
             signer,
-            tx_cache: TxCache::new_from_string(&tx_cache_url)?,
+            tx_cache: TxCache::new_with_client(tx_cache_url, client),
             constants,
         })
     }
