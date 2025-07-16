@@ -3114,9 +3114,9 @@ dependencies = [
 
 [[package]]
 name = "init4-bin-base"
-version = "0.7.1"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54205e79c4a080b23306b5751ea2ab57d79a1df89b08384e7b9530160077410e"
+checksum = "0f93db9e1218b62718037b0507add5079480667a153753cdc12a65b13b501caa"
 dependencies = [
  "alloy",
  "async-trait",
@@ -3131,7 +3131,7 @@ dependencies = [
  "opentelemetry-semantic-conventions",
  "opentelemetry_sdk",
  "serde",
- "signet-constants 0.6.0",
+ "signet-constants",
  "thiserror",
  "tracing",
  "tracing-core",
@@ -5265,18 +5265,6 @@ dependencies = [
 
 [[package]]
 name = "signet-constants"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c5e0ce3e6caadd3b6c783575199c009fab912beed8183435ec38913fe1ad51ce"
-dependencies = [
- "alloy",
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
-name = "signet-constants"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "164c9228a89b5438e468386a9d586868f4fede4fee6e2ebbf4697fff2c088afe"
@@ -5323,7 +5311,7 @@ dependencies = [
  "eyre",
  "init4-bin-base",
  "signet-bundle",
- "signet-constants 0.7.0",
+ "signet-constants",
  "signet-tx-cache",
  "signet-types",
  "signet-zenith",
@@ -5341,7 +5329,7 @@ dependencies = [
  "reqwest",
  "serde",
  "signet-bundle",
- "signet-constants 0.7.0",
+ "signet-constants",
  "signet-types",
  "tracing",
  "uuid",
@@ -5356,7 +5344,7 @@ dependencies = [
  "alloy",
  "chrono",
  "serde",
- "signet-constants 0.7.0",
+ "signet-constants",
  "signet-zenith",
  "thiserror",
 ]
