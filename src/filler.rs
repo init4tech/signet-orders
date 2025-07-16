@@ -238,7 +238,7 @@ where
         let mut tx_requests = Vec::new();
 
         // first, if there is a SignedFill for the Rollup, add a transaction to submit the fill
-        // Note that `fill` transactions MUST be mined *before* the corresponding Order(s) `initiate` transactions in order to cound
+        // Note that `fill` transactions MUST be mined *before* the corresponding Order(s) `initiate` transactions in order to count
         // Host `fill` transactions are always considered to be mined "before" the rollup block is processed,
         // but Rollup `fill` transactions MUST take care to be ordered before the Orders are `initiate`d
         if let Some(rollup_fill) = signed_fills.get(&self.constants.rollup().chain_id()) {
