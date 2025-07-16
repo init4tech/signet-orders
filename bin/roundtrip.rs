@@ -4,7 +4,7 @@ use alloy::{
 };
 use chrono::Utc;
 use init4_bin_base::{
-    deps::tracing::{debug, trace},
+    deps::tracing::debug,
     utils::{from_env::FromEnv, signer::LocalOrAws, tracing::init_tracing},
 };
 use orders::{
@@ -12,6 +12,7 @@ use orders::{
     order::SendOrder,
     provider::{TxSenderProvider, connect_provider},
 };
+use signet_constants::SignetConstants;
 use signet_types::SignedOrder;
 use signet_zenith::RollupOrders::{Input, Order, Output};
 use tokio::time::{Duration, sleep};
@@ -26,35 +27,39 @@ async fn main() -> eyre::Result<()> {
 
     // load config from environment variables
     let config = FillerConfig::from_env()?;
+    let constants = SignetConstants::pecorino();
 
     // connect signer and provider
-    trace!("Connecting signer and provider...");
+    debug!("Connecting signer and provider...");
     let signer = config.signer_config.connect().await?;
     let provider = connect_provider(signer.clone(), config.ru_rpc_url.clone()).await?;
 
     // create an example order swapping 1 rollup USDC for 1 host USDC
     let example_order = Order {
         inputs: vec![Input {
-            token: config.constants.rollup().tokens().usdc(),
+            token: constants.rollup().tokens().usdc(),
             amount: ONE_USDC,
         }],
         outputs: vec![Output {
-            token: config.constants.host().tokens().usdc(),
+            token: constants.host().tokens().usdc(),
             amount: ONE_USDC,
-            chainId: config.constants.host().chain_id() as u32,
+            chainId: constants.host().chain_id() as u32,
             recipient: signer.address(),
         }],
         deadline: U256::from(Utc::now().timestamp() + (60 * 10)), // 10 minutes from now
     };
 
     // sign & send the order to the transaction cache
-    let signed = send_order(example_order, &signer, &config).await?;
+    let signed = send_order(example_order, &signer, &constants).await?;
+    debug!(?signed, "Order signed and sent to transaction cache");
 
     // wait ~1 sec to ensure order is in cache
     sleep(Duration::from_secs(1)).await;
 
     // fill the order from the transaction cache
-    fill_orders(&signed, signer, provider, config).await?;
+    fill_orders(&signed, signer, provider, constants).await?;
+
+    debug!("Order filled successfully");
 
     Ok(())
 }
@@ -63,9 +68,9 @@ async fn main() -> eyre::Result<()> {
 async fn send_order(
     order: Order,
     signer: &LocalOrAws,
-    config: &FillerConfig,
+    constants: &SignetConstants,
 ) -> eyre::Result<SignedOrder> {
-    let send_order = SendOrder::new(signer.clone(), config.constants.clone())?;
+    let send_order = SendOrder::new(signer.clone(), constants.clone())?;
 
     // sign the order, return it back for comparison
     let signed = send_order.sign_order(order).await?;
@@ -81,9 +86,9 @@ async fn fill_orders(
     target_order: &SignedOrder,
     signer: LocalOrAws,
     provider: TxSenderProvider,
-    config: FillerConfig,
+    constants: SignetConstants,
 ) -> eyre::Result<()> {
-    let filler = Filler::new(signer, provider, config.constants)?;
+    let filler = Filler::new(signer, provider, constants)?;
 
     // get all SignedOrders from tx cache
     let orders: Vec<SignedOrder> = filler.get_orders().await?;

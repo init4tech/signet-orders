@@ -9,7 +9,7 @@ use alloy::{
 };
 use eyre::{Error, eyre};
 use init4_bin_base::{
-    deps::tracing::{debug, trace},
+    deps::tracing::{debug, info, trace},
     utils::{from_env::FromEnv, signer::LocalOrAwsConfig},
 };
 use signet_bundle::SignetEthBundle;
@@ -31,9 +31,6 @@ pub struct FillerConfig {
     /// NOTE: For the example, this key must be funded with USDC on both the Host and Rollup, as well as gas on the Rollup.
     /// .env vars: SIGNER_KEY, SIGNER_CHAIN_ID
     pub signer_config: LocalOrAwsConfig,
-    /// The Signet constants.
-    /// .env var: CHAIN_NAME
-    pub constants: SignetConstants,
 }
 
 /// Example code demonstrating API usage and patterns for Signet Fillers.
@@ -125,7 +122,7 @@ where
 
         // sign a SignedFill for the orders
         let mut signed_fills: HashMap<u64, SignedFill> = self.sign_fills(orders).await?;
-        trace!(?signed_fills, "Signed fills");
+        info!(?signed_fills, "Signed fills");
 
         // get the transaction requests for the rollup
         let tx_requests = self.rollup_txn_requests(&signed_fills, orders).await?;
@@ -137,6 +134,7 @@ where
 
         // get the aggregated host fill for the Bundle, if any
         let host_fills = signed_fills.remove(&self.constants.host().chain_id());
+        info!(?host_fills, "Host fills for bundle");
 
         // set the Bundle to only be valid if mined in the next rollup block
         let block_number = self.ru_provider.get_block_number().await? + 1;
@@ -151,6 +149,7 @@ where
                 min_timestamp: None, // sufficiently covered by pinning to next block number
                 max_timestamp: None, // sufficiently covered by pinning to next block number
                 replacement_uuid: None, // optional if implementing strategies that replace or cancel bundles
+                ..Default::default()
             },
         };
         debug!(?bundle, "Forwarding bundle to transaction cache");
@@ -180,11 +179,15 @@ where
             .map_err(|_| eyre!("invalid deadline in orders"))?;
         //  create an AggregateOrder from the SignedOrders they want to fill
         let agg: AggregateOrders = orders.iter().collect();
+        info!(?agg, "Aggregating orders for fill");
         // produce an UnsignedFill from the AggregateOrder
         let mut unsigned_fill = UnsignedFill::from(&agg);
-        unsigned_fill = unsigned_fill.with_deadline(deadline);
+        unsigned_fill = unsigned_fill
+            .with_deadline(deadline)
+            .with_ru_chain_id(self.constants.rollup().chain_id());
+        info!(?unsigned_fill, "Unsigned fill created");
         // populate the Order contract addresses for each chain
-        for chain_id in agg.destination_chain_ids() {
+        for chain_id in agg.target_chain_ids() {
             unsigned_fill = unsigned_fill.with_chain(
                 chain_id,
                 self.constants
@@ -193,6 +196,7 @@ where
                     .ok_or(eyre!("invalid target chain id {}", chain_id))?,
             );
         }
+        info!(?unsigned_fill, "Unsigned fill with chain addresses");
         // sign the UnsignedFill, producing a SignedFill for each target chain
         Ok(unsigned_fill.sign(&self.signer).await?)
     }
