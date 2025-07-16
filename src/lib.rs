@@ -23,4 +23,5 @@ pub mod provider;
 
 // silence clippy
 use chrono as _;
+use clap as _;
 use tokio as _;

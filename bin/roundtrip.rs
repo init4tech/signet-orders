@@ -1,8 +1,9 @@
 use alloy::{
-    primitives::{U256, uint},
+    primitives::{Address, U256, uint},
     signers::Signer,
 };
 use chrono::Utc;
+use clap::Parser;
 use init4_bin_base::{
     deps::tracing::{debug, info, instrument},
     utils::{from_env::FromEnv, signer::LocalOrAws, tracing::init_tracing},
@@ -18,6 +19,14 @@ use tokio::time::{Duration, sleep};
 
 const ONE_USDC: U256 = uint!(1_000_000_U256);
 
+#[derive(Parser, Debug)]
+struct OrdersArgs {
+    /// If present, the order will be filled on the rollup chain.
+    /// If absent, the order will be filled on the host chain.
+    #[arg(long, default_value_t = false)]
+    pub rollup: bool,
+}
+
 /// Construct, sign, and send a Signet Order, then Fill the same Order.
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
@@ -26,6 +35,7 @@ async fn main() -> eyre::Result<()> {
 
     // load config from environment variables
     let config = FillerConfig::from_env()?;
+    let args = OrdersArgs::parse();
 
     // connect signer and provider
     let signer = config.signer_config.connect().await?;
@@ -33,19 +43,7 @@ async fn main() -> eyre::Result<()> {
     info!(signer_address = %signer.address(), "Connected to Signer and Provider");
 
     // create an example order swapping 1 rollup USDC for 1 host USDC
-    let example_order = Order {
-        inputs: vec![Input {
-            token: config.constants.rollup().tokens().usdc(),
-            amount: ONE_USDC,
-        }],
-        outputs: vec![Output {
-            token: config.constants.host().tokens().usdc(),
-            amount: ONE_USDC,
-            chainId: config.constants.host().chain_id() as u32,
-            recipient: signer.address(),
-        }],
-        deadline: U256::from(Utc::now().timestamp() + (60 * 10)), // 10 minutes from now
-    };
+    let example_order = get_example_order(&config, signer.address(), args.rollup);
 
     // sign & send the order to the transaction cache
     let signed = send_order(example_order, &signer, &config).await?;
@@ -60,6 +58,41 @@ async fn main() -> eyre::Result<()> {
     info!("Order filled successfully");
 
     Ok(())
+}
+
+/// Constructs an example [`Order`] based on the provided configuration and recipient address.
+/// If `rollup` is true, it creates an order that targets the rollup; otherwise, it creates an order that targets the host chain.
+fn get_example_order(config: &FillerConfig, recipient: Address, rollup: bool) -> Order {
+    if rollup {
+        Order {
+            inputs: vec![Input {
+                token: config.constants.rollup().tokens().usdc(),
+                amount: ONE_USDC,
+            }],
+            outputs: vec![Output {
+                token: config.constants.host().tokens().usdc(),
+                amount: ONE_USDC,
+                chainId: config.constants.host().chain_id() as u32,
+                recipient,
+            }],
+            deadline: U256::from(Utc::now().timestamp() + (60 * 10)), // 10 minutes from now
+        }
+    } else {
+        // create an example order swapping 1 host USDC for 1 host USDC
+        Order {
+            inputs: vec![Input {
+                token: config.constants.rollup().tokens().usdc(),
+                amount: ONE_USDC,
+            }],
+            outputs: vec![Output {
+                token: config.constants.rollup().tokens().usdc(),
+                amount: ONE_USDC,
+                chainId: config.constants.rollup().chain_id() as u32,
+                recipient,
+            }],
+            deadline: U256::from(Utc::now().timestamp() + (60 * 10)), // 10 minutes from now
+        }
+    }
 }
 
 /// Sign and send an order to the transaction cache.
