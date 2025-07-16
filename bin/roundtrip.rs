@@ -19,7 +19,7 @@ use tokio::time::{Duration, sleep};
 const ONE_USDC: U256 = uint!(1_000_000_U256);
 
 /// Construct, sign, and send a Signet Order, then Fill the same Order.
-#[tokio::main(flavor = "multi_thread")]
+#[tokio::main]
 async fn main() -> eyre::Result<()> {
     // initialize tracing
     init_tracing();
