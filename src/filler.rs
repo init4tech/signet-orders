@@ -9,7 +9,7 @@ use alloy::{
 };
 use eyre::{Error, eyre};
 use init4_bin_base::{
-    deps::tracing::{debug, trace},
+    deps::tracing::{debug, info, instrument},
     utils::{from_env::FromEnv, signer::LocalOrAwsConfig},
 };
 use signet_bundle::SignetEthBundle;
@@ -20,6 +20,10 @@ use std::{collections::HashMap, slice::from_ref};
 
 /// Multiplier for converting gwei to wei.
 const GWEI_TO_WEI: u64 = 1_000_000_000;
+/// Default gas limit for transactions.
+const DEFAULT_GAS_LIMIT: u64 = 1_000_000;
+/// Default priority fee multiplier for transactions.
+const DEFAULT_PRIORITY_FEE_MULTIPLIER: u64 = 16;
 
 /// Configuration for the Filler application.
 #[derive(Debug, FromEnv)]
@@ -59,10 +63,18 @@ where
         ru_provider: TxSenderProvider,
         constants: SignetConstants,
     ) -> Result<Self, Error> {
+        let tx_cache_url: reqwest::Url = constants.environment().transaction_cache().parse()?;
+        let client = reqwest::ClientBuilder::new().use_rustls_tls().build()?;
+
+        debug!(
+            tx_cache_url = tx_cache_url.as_str(),
+            "Connecting to transaction cache"
+        );
+
         Ok(Self {
             signer,
             ru_provider,
-            tx_cache: TxCache::new_from_string(constants.environment().transaction_cache())?,
+            tx_cache: TxCache::new_with_client(tx_cache_url, client),
             constants,
         })
     }
@@ -83,12 +95,14 @@ where
     /// without simulating to check whether it has already been filled, because they can rely on Builder simulation.
     /// Order `initiate` transactions will revert if the Order has already been filled,
     /// in which case the entire Bundle would simply be discarded by the Builder.
+    #[instrument(skip(self, orders))]
     pub async fn fill_individually(&self, orders: &[SignedOrder]) -> Result<(), Error> {
         debug!(orders_count = orders.len(), "Filling orders individually");
 
         // submit one bundle per individual order
         for order in orders {
-            self.fill(from_ref(order)).await?;
+            let response = self.fill(from_ref(order)).await?;
+            debug!(bundle_id = response.id.to_string(), "Bundle sent to cache");
         }
 
         Ok(())
@@ -107,8 +121,9 @@ where
     /// If a single Order is passed to this fn,
     /// Filling Orders individually ensures that even if some Orders are not fillable, others may still mine;
     /// however, it is less gas efficient.
+    #[instrument(skip(self, orders))]
     pub async fn fill(&self, orders: &[SignedOrder]) -> Result<TxCacheSendBundleResponse, Error> {
-        debug!(orders_count = orders.len(), "Filling orders in bundle");
+        info!(orders_count = orders.len(), "Filling orders in bundle");
 
         // if orders is empty, error out
         if orders.is_empty() {
@@ -117,18 +132,20 @@ where
 
         // sign a SignedFill for the orders
         let mut signed_fills: HashMap<u64, SignedFill> = self.sign_fills(orders).await?;
-        trace!(?signed_fills, "Signed fills");
+        debug!(?signed_fills, "Signed fills for orders");
+        info!("Successfully signed fills");
 
         // get the transaction requests for the rollup
         let tx_requests = self.rollup_txn_requests(&signed_fills, orders).await?;
-        trace!(?tx_requests, "Transaction requests");
+        debug!(?tx_requests, "Transaction requests");
 
         // sign & encode the transactions for the Bundle
         let txs = self.sign_and_encode_txns(tx_requests).await?;
-        trace!(?txs, "Encoded transactions");
+        debug!(?txs, "Encoded transactions");
 
         // get the aggregated host fill for the Bundle, if any
         let host_fills = signed_fills.remove(&self.constants.host().chain_id());
+        debug!(?host_fills, "Host fills for bundle");
 
         // set the Bundle to only be valid if mined in the next rollup block
         let block_number = self.ru_provider.get_block_number().await? + 1;
@@ -143,9 +160,11 @@ where
                 min_timestamp: None, // sufficiently covered by pinning to next block number
                 max_timestamp: None, // sufficiently covered by pinning to next block number
                 replacement_uuid: None, // optional if implementing strategies that replace or cancel bundles
+                ..Default::default()
             },
         };
-        debug!(?bundle, "Forwarding bundle to transaction cache");
+        debug!(?bundle, "bundle contents");
+        info!("forwarding bundle to transaction cache");
 
         // submit the Bundle to the transaction cache
         self.tx_cache.forward_bundle(bundle).await
@@ -162,13 +181,30 @@ where
     /// If filling multiple Orders, they may wish to utilize one Order's Outputs to provide another Order's rollup Inputs.
     /// In this case, the Filler would wish to split up the Fills for each Order,
     /// rather than signing a single, aggregate a Fill for each chain, as is done here.
+    #[instrument(skip(self, orders))]
     async fn sign_fills(&self, orders: &[SignedOrder]) -> Result<HashMap<u64, SignedFill>, Error> {
+        if orders.is_empty() {
+            eyre::bail!("no orders to fill");
+        }
+        let deadline = orders[0]
+            .permit
+            .permit
+            .deadline
+            .to_string()
+            .parse::<u64>()
+            .map_err(|e| eyre!("invalid deadline in orders: {e}"))?;
         //  create an AggregateOrder from the SignedOrders they want to fill
         let agg: AggregateOrders = orders.iter().collect();
+        debug!(?agg, "Aggregated orders for fill");
+        info!("Aggregating orders for fill");
         // produce an UnsignedFill from the AggregateOrder
         let mut unsigned_fill = UnsignedFill::from(&agg);
+        unsigned_fill = unsigned_fill
+            .with_deadline(deadline)
+            .with_ru_chain_id(self.constants.rollup().chain_id());
+        debug!(?unsigned_fill, "Unsigned fill created");
         // populate the Order contract addresses for each chain
-        for chain_id in agg.destination_chain_ids() {
+        for chain_id in agg.target_chain_ids() {
             unsigned_fill = unsigned_fill.with_chain(
                 chain_id,
                 self.constants
@@ -177,6 +213,7 @@ where
                     .ok_or(eyre!("invalid target chain id {}", chain_id))?,
             );
         }
+        debug!(?unsigned_fill, "Unsigned fill with chain addresses");
         // sign the UnsignedFill, producing a SignedFill for each target chain
         Ok(unsigned_fill.sign(&self.signer).await?)
     }
@@ -191,6 +228,7 @@ where
     ///
     /// For example, Fillers might utilize one Order's Inputs to fill subsequent Orders' Outputs.
     /// In this case, the rollup transactions should look like [`fill_1`, `inititate_1`, `fill_2`, `initiate_2`].
+    #[instrument(skip(self, signed_fills, orders))]
     async fn rollup_txn_requests(
         &self,
         signed_fills: &HashMap<u64, SignedFill>,
@@ -200,7 +238,7 @@ where
         let mut tx_requests = Vec::new();
 
         // first, if there is a SignedFill for the Rollup, add a transaction to submit the fill
-        // Note that `fill` transactions MUST be mined *before* the corresponding Order(s) `initiate` transactions in order to cound
+        // Note that `fill` transactions MUST be mined *before* the corresponding Order(s) `initiate` transactions in order to count
         // Host `fill` transactions are always considered to be mined "before" the rollup block is processed,
         // but Rollup `fill` transactions MUST take care to be ordered before the Orders are `initiate`d
         if let Some(rollup_fill) = signed_fills.get(&self.constants.rollup().chain_id()) {
@@ -222,6 +260,7 @@ where
 
     /// Given an ordered set of Transaction Requests,
     /// Sign them and encode them for inclusion in a Bundle.
+    #[instrument(skip(self, tx_requests))]
     pub async fn sign_and_encode_txns(
         &self,
         tx_requests: Vec<TransactionRequest>,
@@ -231,8 +270,10 @@ where
             // fill out the transaction fields
             tx = tx
                 .with_from(self.signer.address())
-                .with_gas_limit(1_000_000)
-                .with_max_priority_fee_per_gas((GWEI_TO_WEI * 16) as u128);
+                .with_gas_limit(DEFAULT_GAS_LIMIT)
+                .with_max_priority_fee_per_gas(
+                    (GWEI_TO_WEI * DEFAULT_PRIORITY_FEE_MULTIPLIER) as u128,
+                );
 
             // sign the transaction
             let SendableTx::Envelope(filled) = self.ru_provider.fill(tx).await? else {

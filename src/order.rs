@@ -1,6 +1,6 @@
 use alloy::signers::Signer;
 use eyre::Error;
-use init4_bin_base::deps::tracing::{debug, trace};
+use init4_bin_base::deps::tracing::{debug, instrument};
 use signet_constants::SignetConstants;
 use signet_tx_cache::client::TxCache;
 use signet_types::{SignedOrder, UnsignedOrder};
@@ -23,9 +23,17 @@ where
 {
     /// Create a new SendOrder instance.
     pub fn new(signer: S, constants: SignetConstants) -> Result<Self, Error> {
+        let tx_cache_url: reqwest::Url = constants.environment().transaction_cache().parse()?;
+        let client = reqwest::ClientBuilder::new().use_rustls_tls().build()?;
+
+        debug!(
+            tx_cache_url = tx_cache_url.as_str(),
+            "Connecting to transaction cache"
+        );
+
         Ok(Self {
             signer,
-            tx_cache: TxCache::new_from_string(constants.environment().transaction_cache())?,
+            tx_cache: TxCache::new_with_client(tx_cache_url, client),
             constants,
         })
     }
@@ -37,8 +45,9 @@ where
     }
 
     /// Sign an Order.
+    #[instrument(skip(self, order))]
     pub async fn sign_order(&self, order: Order) -> Result<SignedOrder, Error> {
-        trace!(?order, "Signing order");
+        debug!(?order, "Signing order");
 
         // make an UnsignedOrder from the Order
         let unsigned = UnsignedOrder::from(&order);
@@ -55,6 +64,7 @@ where
     }
 
     /// Forward a SignedOrder to the transaction cache.
+    #[instrument(skip(self, signed))]
     pub async fn send_order(&self, signed: SignedOrder) -> Result<(), Error> {
         // send the SignedOrder to the transaction cache
         debug!(order = ?signed, "Forwarding signed order to transaction cache");

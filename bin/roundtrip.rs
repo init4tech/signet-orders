@@ -4,7 +4,7 @@ use alloy::{
 };
 use chrono::Utc;
 use init4_bin_base::{
-    deps::tracing::{debug, trace},
+    deps::tracing::{debug, info, instrument},
     utils::{from_env::FromEnv, signer::LocalOrAws, tracing::init_tracing},
 };
 use orders::{
@@ -19,7 +19,7 @@ use tokio::time::{Duration, sleep};
 const ONE_USDC: U256 = uint!(1_000_000_U256);
 
 /// Construct, sign, and send a Signet Order, then Fill the same Order.
-#[tokio::main(flavor = "multi_thread")]
+#[tokio::main]
 async fn main() -> eyre::Result<()> {
     // initialize tracing
     init_tracing();
@@ -28,9 +28,9 @@ async fn main() -> eyre::Result<()> {
     let config = FillerConfig::from_env()?;
 
     // connect signer and provider
-    trace!("Connecting signer and provider...");
     let signer = config.signer_config.connect().await?;
     let provider = connect_provider(signer.clone(), config.ru_rpc_url.clone()).await?;
+    info!(signer_address = %signer.address(), "Connected to Signer and Provider");
 
     // create an example order swapping 1 rollup USDC for 1 host USDC
     let example_order = Order {
@@ -44,27 +44,33 @@ async fn main() -> eyre::Result<()> {
             chainId: config.constants.host().chain_id() as u32,
             recipient: signer.address(),
         }],
-        deadline: U256::from(Utc::now().timestamp() + 60), // 60 seconds from now
+        deadline: U256::from(Utc::now().timestamp() + (60 * 10)), // 10 minutes from now
     };
 
     // sign & send the order to the transaction cache
     let signed = send_order(example_order, &signer, &config).await?;
+    debug!(?signed, "Order contents");
+    info!("Order signed and sent to transaction cache");
 
     // wait ~1 sec to ensure order is in cache
     sleep(Duration::from_secs(1)).await;
 
     // fill the order from the transaction cache
     fill_orders(&signed, signer, provider, config).await?;
+    info!("Order filled successfully");
 
     Ok(())
 }
 
 /// Sign and send an order to the transaction cache.
+#[instrument(skip(order, signer, config), level = "debug", fields(signer_address = %signer.address()))]
 async fn send_order(
     order: Order,
     signer: &LocalOrAws,
     config: &FillerConfig,
 ) -> eyre::Result<SignedOrder> {
+    info!("signing and sending order");
+
     let send_order = SendOrder::new(signer.clone(), config.constants.clone())?;
 
     // sign the order, return it back for comparison
@@ -76,28 +82,29 @@ async fn send_order(
     Ok(signed)
 }
 
-/// Fill example orders from the transaction cache.
+/// Fill example [`SignedOrder`]s from the transaction cache.
+#[instrument(skip(target_order, signer, provider, config), level = "debug")]
 async fn fill_orders(
     target_order: &SignedOrder,
     signer: LocalOrAws,
     provider: TxSenderProvider,
     config: FillerConfig,
 ) -> eyre::Result<()> {
+    info!("filling orders from transaction cache");
     let filler = Filler::new(signer, provider, config.constants)?;
 
-    // get all SignedOrders from tx cache
-    let orders: Vec<SignedOrder> = filler.get_orders().await?;
+    // get all the [`SignedOrder`]s from tx cache
+    let mut orders: Vec<SignedOrder> = filler.get_orders().await?;
     debug!(
-        order_count = orders.len(),
-        "Queried orders from transaction cache"
+        orders = ?orders,
+        "Queried order contents from transaction cache"
     );
 
-    // filter orders into a Vec<SignedOrder> of only orders that match the target order
-    let fillable_orders: Vec<SignedOrder> =
-        orders.into_iter().filter(|o| o == target_order).collect();
+    // Retain only the orders that match the target order
+    orders.retain(|o| o == target_order);
 
     // fill each individually
-    filler.fill_individually(fillable_orders.as_slice()).await?;
+    filler.fill_individually(orders.as_slice()).await?;
 
     Ok(())
 }

@@ -17,14 +17,14 @@ name = "order-roundtrip-example"
 path = "bin/roundtrip.rs"
 
 [dependencies]
-init4-bin-base = { version = "0.4.2", features = ["alloy"] }
-signet-constants =  { version = "0.2.0" }
-signet-zenith =  { version = "0.2.0" }
-signet-types =  { version = "0.2.0" }
-signet-tx-cache =  { version = "0.2.0" }
-signet-bundle =  { version = "0.2.0" }
+init4-bin-base = { version = "0.8.0", features = ["alloy"] }
+signet-constants =  { version = "0.7.0" }
+signet-zenith =  { version = "0.7.0" }
+signet-types =  { version = "0.7.0" }
+signet-tx-cache =  { version = "0.7.0" }
+signet-bundle =  { version = "0.7.0" }
 
-alloy = { version = "1.0.5", features = [
+alloy = { version = "1.0.19", features = [
     "full",
     "json-rpc",
     "signer-aws",
@@ -35,5 +35,7 @@ alloy = { version = "1.0.5", features = [
 ] }
 
 tokio = { version = "1.36.0", features = ["full", "macros", "rt-multi-thread"] }
+tracing = "0.1.40"
+reqwest = { version = "0.12.22", features = ["rustls-tls-native-roots", "json"]}
 chrono = "0.4.38"
 eyre = "0.6.12"
