@@ -39,3 +39,4 @@ tracing = "0.1.40"
 reqwest = { version = "0.12.22", features = ["rustls-tls-native-roots", "json"]}
 chrono = "0.4.38"
 eyre = "0.6.12"
+clap = { version = "4.5.41", features = ["derive"] }
