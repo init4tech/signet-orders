@@ -37,6 +37,7 @@ pub struct FillerConfig {
     pub signer_config: LocalOrAwsConfig,
     /// The Signet constants.
     /// .env var: CHAIN_NAME
+    #[from_env(var = "CHAIN_NAME", desc = "Signet chain name")]
     pub constants: SignetConstants,
 }
 
