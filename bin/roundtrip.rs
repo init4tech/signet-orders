@@ -1,6 +1,5 @@
 use alloy::{
-    primitives::{Address, U256, uint},
-    signers::Signer,
+    consensus::constants::GWEI_TO_WEI, primitives::{Address, U256}, signers::Signer
 };
 use chrono::Utc;
 use clap::Parser;
@@ -16,8 +15,6 @@ use orders::{
 use signet_types::SignedOrder;
 use signet_zenith::RollupOrders::{Input, Order, Output};
 use tokio::time::{Duration, sleep};
-
-const ONE_USDC: U256 = uint!(1_000_000_U256);
 
 #[derive(Parser, Debug)]
 struct OrdersArgs {
@@ -66,12 +63,12 @@ fn get_example_order(config: &FillerConfig, recipient: Address, rollup: bool) ->
     if rollup {
         Order {
             inputs: vec![Input {
-                token: config.constants.rollup().tokens().usdc(),
-                amount: ONE_USDC,
+                token: config.constants.rollup().tokens().weth(),
+                amount: U256::from(GWEI_TO_WEI),
             }],
             outputs: vec![Output {
-                token: config.constants.rollup().tokens().usdc(),
-                amount: ONE_USDC,
+                token: config.constants.rollup().tokens().weth(),
+                amount: U256::from(GWEI_TO_WEI),
                 chainId: config.constants.rollup().chain_id() as u32,
                 recipient,
             }],
@@ -80,12 +77,12 @@ fn get_example_order(config: &FillerConfig, recipient: Address, rollup: bool) ->
     } else {
         Order {
             inputs: vec![Input {
-                token: config.constants.rollup().tokens().usdc(),
-                amount: ONE_USDC,
+                token: config.constants.rollup().tokens().weth(),
+                amount: U256::from(GWEI_TO_WEI),
             }],
             outputs: vec![Output {
-                token: config.constants.host().tokens().usdc(),
-                amount: ONE_USDC,
+                token: config.constants.host().tokens().weth(),
+                amount: U256::from(GWEI_TO_WEI),
                 chainId: config.constants.host().chain_id() as u32,
                 recipient,
             }],
