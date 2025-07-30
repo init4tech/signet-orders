@@ -1,79 +1,110 @@
-# Signet Orders 
+# Signet Orders
 
-This repository contains example code for placing & filling Orders on Signet. It is built using utilities in [signet-sdk](https://github.com/init4tech/signet-sdk).
+This repository provides example code for **placing and filling Orders** on Signet, built using utilities from [signet-sdk](https://github.com/init4tech/signet-sdk).
+
+---
 
 ## Fillers
-Code: `src/filler.rs` 
+**Code:** `src/filler.rs`
 
-The `Filler` struct contains example code for the basic steps necessary to Fill Signet Orders. Given a set of Orders as input, the `Filler` struct
+The `Filler` struct demonstrates the basic steps required to **fill Signet Orders**. Given a set of Orders, it:
 
-- constructs and signs Permit2 struct(s) to Fill the set of Orders on their destination chain(s)
-- constructs a Signet Bundle that batches transactions to `intitiate` and `fill` the set of Orders
-- sends the Signet Bundle to the Transaction Cache where it can be mined by Signet Builders
+1. Constructs and signs **Permit2** structs to fill the Orders on their destination chains.
+2. Builds a **Signet Bundle** that batches `initiate` and `fill` transactions for those Orders.
+3. Sends the Signet Bundle to the **Transaction Cache**, where it can be mined by Signet Builders.
 
-#### Missing Components
-In a real-life scenario, Fillers will need to implement their own custom business logic to filter which Order(s) they wish to fill. 
+### Missing Components
+In production, a Filler will need to:
 
-Fillers may also wish to modify or extend the simple logic presented here with more complex business logic, such performing swaps to source liquidity in between filling Orders.
+- Implement custom **business logic** to determine which Orders to fill.  
+- Potentially extend the example logic with **advanced strategies**, such as performing swaps to source liquidity between fills.
 
-#### Filling Strategies
+### Filling Strategies
+The `Filler` struct demonstrates two strategies for filling Orders:
 
-Given a set of Orders to Fill, the `Filler` struct presents two strategies for filling them: 
-1. Fill them together (`fill`) - submit all Orders/Fills in one Signet Bundle, such that _all_ of the Orders and Fills mine, or none of them do.
-2. Fill them individually (`fill_individually`) - submit each Order/Fill in a separate Signet Bundle, such that they fail or succeed individually. 
+1. **Fill together (`fill`)**  
+   - Submits all Orders/Fills in a single Signet Bundle.  
+   - Either **all Orders mine** together or **none do** (atomic execution).
 
-A nice feature of filling Orders individually is that Fillers could be less concerned about carefully simulating Orders onchain before attempting to fill them. As long as an Order is economically a "good deal" for the Filler, they can attempt to fill it
-without simulating to check whether it has already been filled, because they can rely on Builder simulation. Order `initiate` transactions will revert if the Order has already been filled, in which case the entire Bundle would simply be discarded by the Builder.
+2. **Fill individually (`fill_individually`)**  
+   - Submits each Order/Fill in its own Bundle.  
+   - Orders succeed or fail **independently**.
 
-On the other hand, Filling Orders in aggregate means that Fills are batched into a single Permit2 and more gas efficient; also, Fillers can use more complex strategies such as utilizing the Inputs of one Order to Fill the subsequent Order. However, if a single Order cannot be filled, then the entire Bundle will not mine. For example, using this strategy, if only one Order is filled by another Filler first, then all other Orders will also not be filled.
+**Pros and Cons:**
 
+- **Individual fills** are simpler — Fillers can rely on Builder simulation instead of pre-checking if an Order is already filled. If an `initiate` transaction reverts (because the Order was already filled), the Bundle is simply discarded.
+- **Aggregate fills** are **more gas-efficient** and allow strategies like reusing inputs from one Order to fill another. However, if any single Order fails, the **entire Bundle will not mine**.
+
+---
 
 ## Orders
-Code: `src/order.rs`
+**Code:** `src/order.rs`
 
-The `SendOrder` struct contains example code for Initiating an Order. Given an Order struct which specifies the desired Input/Output tokens, the `SendOrder` struct
-- constructs and signs Permit2 struct to Initiate the Order on-chain
-- sends the Signed Order to the Transaction Cache, where Fillers may fulfill it.
+The `SendOrder` struct provides example code for **initiating an Order**. Given an Order specifying input and output tokens, it:
 
-## Full Example 
-Code: `bin/roundtrip.rs`
+1. Constructs and signs a **Permit2** struct to initiate the Order on-chain.  
+2. Sends the signed Order to the **Transaction Cache**, where Fillers can fill it.
 
-This contains a fully prepared executable binary which (1) constructs an example Order, signs it, and sends it to the Transaction Cache, then (2) queries Orders from the Transaction Cache and Fills the example Order. 
+---
 
-You can edit the example Order to swap any set of tokens on the Host and/or Rollup. Orders can contain multiple Inputs in exchange for multiple Outputs; Outputs can be targeted to the Host or on the Rollup. Feel free to play with it and try it out! 
+## Full Example
+**Code:** `bin/roundtrip.rs`
 
-### Running the Example 
+This example executable:
 
-1. Set up the necessary environment variables:
-```
+1. Constructs an example Order, signs it, and sends it to the Transaction Cache.  
+2. Queries available Orders and fills the example Order.
+
+You can freely modify the example Order to:
+
+- Swap **any set of tokens** on the Host and/or Rollup.  
+- Use **multiple Inputs and Outputs**, targeting either the Host or Rollup.
+
+---
+
+### Running the Example
+
+1. **Set environment variables**  
+```bash
 export CHAIN_NAME=pecorino
 export RU_RPC_URL=https://rpc.pecorino.signet.sh/
 export SIGNER_KEY=[AWS KMS key ID or local private key]
 export SIGNER_CHAIN_ID=14174
 ```
 
-2. Fund a key
-This example works with _either_ an AWS KMS Key or a raw local private key. This key is both the User that Initiates the Order and the Filler that Fills the Order. As such, it will need to be funded with: 
-- the Input tokens on the Rollup
-- the Output tokens on the Host and/or Rollup
-- gas tokens to pay for transactions on the Rollup
+2. **Fund your key**  
+The example works with **either** an AWS KMS key or a raw local private key.  
+This key acts as **both** the Order Initiator and Filler, and must be funded with:
 
-In the default example Order, 1 Rollup WETH Input is swapped for 1 Host WETH Output. Remember you can edit the Order however you want and the example will still work!
+- Input tokens on the Rollup  
+- Output tokens on the Host and/or Rollup  
+- Gas tokens to pay for Rollup transactions
 
-3. Configure token permissions 
-This example uses Permit2 for Initiating and Filling Orders. As such, one must approve Permit2 to spend all Input and Output tokens from the example key.
+By default, the example swaps **1 Rollup WETH Input → 1 Host WETH Output**, but you can edit the Order freely.
 
-You can execute the following command for any relevant token(s):
+3. **Configure token permissions**  
+This example uses **Permit2** for both initiating and filling Orders.  
+Approve Permit2 to spend all relevant Input and Output tokens for the key:
+
+```bash
+cast send [TOKEN_ADDRESS] "approve(address,uint256)" \
+  0x000000000022D473030F116dDEE9F6B43aC78BA3 \
+  0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff \
+  --rpc-url $RPC_URL
 ```
-cast send [TOKEN_ADDRESS]  "approve(address,uint256)" 0x000000000022D473030F116dDEE9F6B43aC78BA3 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff --rpc-url $RPC_URL 
-```
-Note that Permit2 has the same address on Pecorino Rollup and Host chains as it does on Mainnet Ethereum. 
 
-4. Run the script! 
-```
-cargo run --bin order-roundtrip-examplec
-```
-Et voilà ~ 
+Permit2 uses the same address on Pecorino Rollup and Host as on Ethereum Mainnet.
 
-#### Troubleshooting
-Signet Bundles are specified to land in one specific block. If you don't see the Bundle included in its specified block for any reason, it will not mine in any subsequent blocks. You can run the script again to retry.
+4. **Run the script**  
+```bash
+cargo run --bin order-roundtrip-example
+```
+
+Et voilà! 🎉
+
+---
+
+### Troubleshooting
+Signet Bundles are tied to a **specific block**.  
+If your Bundle is not included in that block, it will **not** mine in later blocks.  
+Simply re-run the script to retry.
