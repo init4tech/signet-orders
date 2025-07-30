@@ -1,5 +1,7 @@
 use alloy::{
-    consensus::constants::GWEI_TO_WEI, primitives::{Address, U256}, signers::Signer
+    consensus::constants::GWEI_TO_WEI,
+    primitives::{Address, U256},
+    signers::Signer,
 };
 use chrono::Utc;
 use clap::Parser;
