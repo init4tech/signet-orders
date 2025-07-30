@@ -96,8 +96,17 @@ cast send [TOKEN_ADDRESS] "approve(address,uint256)" \
 Permit2 uses the same address on Pecorino Rollup and Host as on Ethereum Mainnet.
 
 4. **Run the script**  
+
+This runs an RU to HOST fill.
+
 ```bash
 cargo run --bin order-roundtrip-example
+```
+
+To run an RU to RU fill, pass the `--rollup` flag to the command.
+
+```bash
+cargo run --bin order-roundtrip-example -- --rollup    
 ```
 
 Et voilà! 🎉
