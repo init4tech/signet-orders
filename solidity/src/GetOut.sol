@@ -5,17 +5,29 @@ import {RollupOrders} from "zenith/src/orders/RollupOrders.sol";
 
 import {SignetStd} from "./SignetStd.sol";
 
+/// @title GetOut
+/// @author init4
+/// @notice A contract that gets out of the Rollup by converting native USD to
+///         to USDC on the host network.
+/// @dev This contract inherits the SignetStd contract and automatically
+///      configures rollup constants on construction.
 contract GetOut is SignetStd() {
+    /// @notice Thrown when no value is sent to the contract.
+    error NoValue();
 
-    fallback() external payable {
-        getOut();
-    }
-
+    /// @notice Simply forwards any native asset sent to this contract
+    ///         to the `getOut` function.
     receive() external payable {
         getOut();
     }
 
+    /// @notice Converts native USD to USDC on the host network with a flat
+    ///         50bps fee.
+    /// @custom:reverts NoValue when no value is sent to the contract.
+    /// @custom:emits OrderOrigin.Order
     function getOut() public payable {
+        require(msg.value > 0, NoValue());
+
         uint256 desired = msg.value * 995 / 1000; // 0.5% fee
 
         RollupOrders.Input[] memory inputs = new RollupOrders.Input[](1);

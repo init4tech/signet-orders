@@ -6,7 +6,16 @@ import {RollupPassage} from "zenith/src/passage/RollupPassage.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 
+/// @title PecorinoConstants
+/// @author init4
+/// @notice Constants for the Pecorino testnet.
+/// @dev These constants are used to configure the SignetStd contract in its
+///      constructor, if the chain ID matches the Pecorino testnet chain ID.
 library PecorinoConstants {
+
+    uint32 constant HOST_CHAIN_ID = 3151908; // Pecorino Host chain ID
+    uint32 constant ROLLUP_CHAIN_ID = 14174; // Pecorino testnet chain ID
+
     RollupPassage constant PECORINO_ROLLUP_PASSAGE = RollupPassage(payable(0x0000000000007369676E65742D70617373616765));
 
     RollupOrders constant PECORINO_ROLLUP_ORDERS = RollupOrders(0x000000000000007369676E65742D6f7264657273);
@@ -23,10 +32,13 @@ library PecorinoConstants {
     IERC20 constant WETH = IERC20(0x0000000000000000007369676e65742d77657468);
     IERC20 constant WBTC = IERC20(0x0000000000000000007369676e65742D77627463);
     IERC20 constant WUSD = IERC20(0x0000000000000000007369676e65742D77757364);
+
 }
 
 contract SignetStd {
     address constant NATIVE_ASSET = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+
+    uint32 internal immutable HOST_CHAIN_ID;
 
     RollupPassage internal immutable PASSAGE;
     RollupOrders internal immutable ORDERS;
@@ -40,8 +52,10 @@ contract SignetStd {
     address internal immutable HOST_WBTC;
     address internal immutable HOST_WETH;
 
+
     constructor () {
-        if (block.chainid == 14174) {
+        // Auto-configure based on the chain ID.
+        if (block.chainid == PecorinoConstants.ROLLUP_CHAIN_ID) {
             PASSAGE = PecorinoConstants.PECORINO_ROLLUP_PASSAGE;
             ORDERS = PecorinoConstants.PECORINO_ROLLUP_ORDERS;
 
@@ -53,6 +67,8 @@ contract SignetStd {
             HOST_USDT = PecorinoConstants.HOST_USDT;
             HOST_WBTC = PecorinoConstants.HOST_WBTC;
             HOST_WETH = PecorinoConstants.HOST_WETH;
+
+            HOST_CHAIN_ID = PecorinoConstants.HOST_CHAIN_ID;
         } else {
             revert("Unsupported chain");
         }
