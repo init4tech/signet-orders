@@ -6,8 +6,7 @@ import {SignetStd} from "../SignetStd.sol";
 
 /// @notice This contract provides tools for contracts to pay searchers to run
 ///         code.
-abstract contract PayYou is SignetStd{
-
+abstract contract PayYou is SignetStd {
     /// @notice A modifier that creates USD MEV of the specified amount.
     modifier paysYou(uint256 tip) {
         _;
@@ -28,10 +27,7 @@ abstract contract PayYou is SignetStd{
     /// @notice Create MEV of the specified asset and amount.
     /// @param asset The address of the asset to be paid.
     /// @param amount The amount of the asset to be paid.
-    function providePayment(
-        address asset,
-        uint256 amount
-    ) internal {
+    function providePayment(address asset, uint256 amount) internal {
         RollupOrders.Input[] memory inputs = new RollupOrders.Input[](1);
         inputs[0] = makeInput(asset, amount);
 

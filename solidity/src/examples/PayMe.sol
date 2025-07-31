@@ -26,7 +26,6 @@ abstract contract PayMe is SignetStd {
         demandPayment(NATIVE_ASSET, loot);
     }
 
-
     /// @notice Creates an order that demands payment of the specified amount
     ///         of the specified asset to the contract.
     /// @dev This is useful for cases where the payment should go to the
