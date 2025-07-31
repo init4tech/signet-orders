@@ -36,7 +36,7 @@ contract GetOut is SignetStd {
         outputs[0] = hostUsdcOutput(desired, msg.sender);
 
         ORDERS.initiate{value: msg.value}(
-            type(uint256).max, // this is equivalent to no deadline
+            block.timestamp, // this is equivalent to no deadline
             inputs,
             outputs
         );
