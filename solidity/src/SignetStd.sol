@@ -17,17 +17,17 @@ library PecorinoConstants {
     uint32 constant ROLLUP_CHAIN_ID = 14174;
 
     /// @notice The Rollup Passage contract for the Pecorino testnet.
-    RollupPassage constant PECORINO_ROLLUP_PASSAGE = RollupPassage(payable(0x0000000000007369676e65742d70617373616765));
+    RollupPassage constant PECORINO_ROLLUP_PASSAGE = RollupPassage(payable(0x0000000000007369676E65742D70617373616765));
 
     /// @notice The Rollup Orders contract for the Pecorino testnet.
-    RollupOrders constant PECORINO_ROLLUP_ORDERS = RollupOrders(0x000000000000007369676e65742d6f7264657273);
+    RollupOrders constant PECORINO_ROLLUP_ORDERS = RollupOrders(0x000000000000007369676E65742D6f7264657273);
 
     /// USDC token for the Pecorino testnet host chain.
-    address constant HOST_USDC = 0x65fb255585458de1f9a246b476aa8d5c5516f6fd;
+    address constant HOST_USDC = 0x65Fb255585458De1F9A246b476aa8d5C5516F6fd;
     /// USDT token for the Pecorino testnet host chain.
-    address constant HOST_USDT = 0xb9df1b911b6cf6935b2a918ba03df2372e94e267;
+    address constant HOST_USDT = 0xb9Df1b911B6cf6935b2a918Ba03dF2372E94e267;
     /// WBTC token for the Pecorino testnet host chain.
-    address constant HOST_WBTC = 0xfb29f7d7a4ce607d6038d44150315e5f69bea08a;
+    address constant HOST_WBTC = 0xfb29F7d7a4CE607D6038d44150315e5F69BEa08A;
     /// WETH token for the Pecorino testnet host chain.
     address constant HOST_WETH = 0xd03d085B78067A18155d3B29D64914df3D19A53C;
 
