@@ -25,6 +25,8 @@ use std::time::{Duration, Instant};
 use tokio::time::timeout;
 use tracing::{info, instrument};
 
+const TRANSACTION_RECEIPT_TIMEOUT: Duration = Duration::from_secs(240);
+
 #[derive(Debug, Clone, FromEnv)]
 struct Config {
     #[from_env(var = "RPC_URL", desc = "Ethereum RPC URL")]
@@ -101,7 +103,7 @@ async fn send_transaction(provider: &HostProvider, recipient_address: Address) {
     let result = provider.send_transaction(tx).await.unwrap();
     info!(tx_hash = %result.tx_hash(), "transaction sent");
 
-    let receipt = match timeout(Duration::from_secs(240), result.get_receipt()).await {
+    let receipt = match timeout(TRANSACTION_RECEIPT_TIMEOUT, result.get_receipt()).await {
         Ok(Ok(receipt)) => {
             info!(?receipt.transaction_hash, "transaction receipt received");
             debug!(?receipt, "transaction receipt details");
