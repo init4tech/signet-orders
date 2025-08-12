@@ -23,13 +23,13 @@ library PecorinoConstants {
     RollupOrders constant PECORINO_ROLLUP_ORDERS = RollupOrders(0x000000000000007369676E65742D6f7264657273);
 
     /// USDC token for the Pecorino testnet host chain.
-    address constant HOST_USDC = 0x885F8DB528dC8a38aA3DDad9D3F619746B4a6A81;
+    address constant HOST_USDC = 0x65Fb255585458De1F9A246b476aa8d5C5516F6fd;
     /// USDT token for the Pecorino testnet host chain.
-    address constant HOST_USDT = 0x7970D259D4a96764Fa9B23FF0715A35f06f52D1A;
+    address constant HOST_USDT = 0xb9Df1b911B6cf6935b2a918Ba03dF2372E94e267;
     /// WBTC token for the Pecorino testnet host chain.
-    address constant HOST_WBTC = 0x9aeDED4224f3dD31aD8A0B1FcD05E2d7829283a7;
+    address constant HOST_WBTC = 0xfb29F7d7a4CE607D6038d44150315e5F69BEa08A;
     /// WETH token for the Pecorino testnet host chain.
-    address constant HOST_WETH = 0x572C4d72080ed9E9997509b583a22B785B70cB3f;
+    address constant HOST_WETH = 0xd03d085B78067A18155d3B29D64914df3D19A53C;
 
     /// @notice WETH token address for the Pecorino testnet.
     IERC20 constant WETH = IERC20(0x0000000000000000007369676e65742d77657468);
