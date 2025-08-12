@@ -21,9 +21,9 @@ use init4_bin_base::{
     init4,
     utils::{from_env::FromEnv, signer::LocalOrAwsConfig},
 };
-use tracing::{info, instrument};
 use std::time::{Duration, Instant};
 use tokio::time::timeout;
+use tracing::{info, instrument};
 
 #[derive(Debug, Clone, FromEnv)]
 struct Config {
@@ -106,7 +106,7 @@ async fn send_transaction(provider: &HostProvider, recipient_address: Address) {
             info!(?receipt.transaction_hash, "transaction receipt received");
             debug!(?receipt, "transaction receipt details");
             receipt
-        },
+        }
         Ok(Err(e)) => {
             error!(error = ?e, "failed to get transaction receipt");
             return;
