@@ -107,7 +107,8 @@ async fn send_transaction(provider: &HostProvider, recipient_address: Address) {
 
     let receipt = match timeout(TRANSACTION_RECEIPT_TIMEOUT, result.get_receipt()).await {
         Ok(Ok(receipt)) => {
-            tracing::Span::current().record("receipt", format!("{:?}", receipt));
+            tracing::Span::current().record("tx_status", "mined");
+            tracing::Span::current().record("tx_status", receipt.status());
             info!(?receipt.transaction_hash, "transaction receipt received");
             debug!(?receipt, "transaction receipt details");
             receipt
