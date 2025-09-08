@@ -77,7 +77,6 @@ async fn main() {
 /// Sends a transaction to the specified recipient address
 #[instrument(skip(provider))]
 async fn send_transaction(provider: &HostProvider, recipient_address: Address) {
-    tracing::Span::current().record("recipient_address", recipient_address.to_string());
     info!("attempting transaction");
     // construct simple transaction to send ETH to a recipient
     let nonce = match provider
@@ -103,7 +102,6 @@ async fn send_transaction(provider: &HostProvider, recipient_address: Address) {
     let dispatch_start_time: Instant = Instant::now();
     let result = provider.send_transaction(tx).await.unwrap();
     tracing::Span::current().record("tx_hash", result.tx_hash().to_string());
-    info!(tx_hash = %result.tx_hash(), "transaction sent");
 
     let receipt = match timeout(TRANSACTION_RECEIPT_TIMEOUT, result.get_receipt()).await {
         Ok(Ok(receipt)) => {
