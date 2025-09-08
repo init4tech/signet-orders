@@ -111,9 +111,8 @@ async fn send_order(
     tracing::Span::current()
         .record(
             "signed_order_signature",
-            signed.permit.signature.to_string(),
-        )
-        .record("signed_order_owner", signed.permit.owner.to_string());
+            signed.order_hash().to_string(),
+        );
     debug!(?signed, "Signed order contents");
 
     // send the signed order to the transaction cache
