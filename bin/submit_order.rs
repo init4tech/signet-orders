@@ -17,6 +17,8 @@ use signet_types::SignedOrder;
 use signet_zenith::RollupOrders::{Input, Order, Output};
 use tokio::time::{Duration, sleep};
 
+const TX_CACHE_WAIT_TIME: Duration = Duration::from_millis(500);
+
 #[derive(Debug, FromEnv)]
 struct OrdersArgs {
     /// If true, the order will be filled on the rollup chain.
@@ -50,12 +52,10 @@ async fn main() -> eyre::Result<()> {
 
         let signed = send_order(example_order, &signer, &config).await?;
         debug!(?signed, "Order contents");
-        info!("Order signed and sent to transaction cache");
 
-        sleep(Duration::from_millis(500)).await;
+        sleep(TX_CACHE_WAIT_TIME).await;
 
         fill_orders(&signed, signer.clone(), provider.clone(), &config).await?;
-        info!("Order filled successfully");
 
         sleep(Duration::from_millis(sleep_time)).await;
     }
@@ -96,7 +96,7 @@ fn get_example_order(config: &FillerConfig, recipient: Address, rollup: bool) ->
 }
 
 /// Sign and send an order to the transaction cache.
-#[instrument(skip(order, signer, config), level = "debug", fields(signer_address = %signer.address()))]
+#[instrument(skip(order, signer, config), fields(signer_address = %signer.address()))]
 async fn send_order(
     order: Order,
     signer: &LocalOrAws,
@@ -108,15 +108,18 @@ async fn send_order(
 
     // sign the order, return it back for comparison
     let signed = send_order.sign_order(order).await?;
+    tracing::Span::current().record("signed_order_signature", signed.order_hash().to_string());
+    debug!(?signed, "Signed order contents");
 
     // send the signed order to the transaction cache
     send_order.send_order(signed.clone()).await?;
+    info!("Order signed and sent to transaction cache");
 
     Ok(signed)
 }
 
 /// Fill example [`SignedOrder`]s from the transaction cache.
-#[instrument(skip(target_order, signer, provider, config), level = "debug")]
+#[instrument(skip(target_order, signer, provider, config), fields(target_order_signature = %target_order.permit.signature, target_order_owner = %target_order.permit.owner))]
 async fn fill_orders(
     target_order: &SignedOrder,
     signer: LocalOrAws,
@@ -138,6 +141,8 @@ async fn fill_orders(
 
     // fill each individually
     filler.fill_individually(orders.as_slice()).await?;
+
+    info!("Order filled successfully");
 
     Ok(())
 }

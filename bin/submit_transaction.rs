@@ -23,6 +23,9 @@ use init4_bin_base::{
 };
 use std::time::{Duration, Instant};
 use tokio::time::timeout;
+use tracing::{info, instrument};
+
+const TRANSACTION_RECEIPT_TIMEOUT: Duration = Duration::from_secs(240);
 
 #[derive(Debug, Clone, FromEnv)]
 struct Config {
@@ -57,23 +60,24 @@ async fn main() {
     let _guard = init4();
 
     let config = Config::from_env().unwrap();
-    debug!(?config.recipient_address, "connecting to provider");
 
     let provider = config.provider().await;
     let recipient_address = config.recipient_address;
     let sleep_time = config.sleep_time;
+    info!("transaction submitter ready");
 
     loop {
-        debug!(?recipient_address, "attempting transaction");
         send_transaction(&provider, recipient_address).await;
 
-        debug!(sleep_time, "sleeping");
+        info!(sleep_time_ms = sleep_time, "sleeping");
         tokio::time::sleep(tokio::time::Duration::from_millis(sleep_time)).await;
     }
 }
 
 /// Sends a transaction to the specified recipient address
+#[instrument(skip(provider))]
 async fn send_transaction(provider: &HostProvider, recipient_address: Address) {
+    info!("attempting transaction");
     // construct simple transaction to send ETH to a recipient
     let nonce = match provider
         .get_transaction_count(provider.default_signer_address())
@@ -85,6 +89,7 @@ async fn send_transaction(provider: &HostProvider, recipient_address: Address) {
             return;
         }
     };
+    debug!(nonce, "fetched transaction nonce");
 
     let tx = TransactionRequest::default()
         .with_from(provider.default_signer_address())
@@ -92,17 +97,20 @@ async fn send_transaction(provider: &HostProvider, recipient_address: Address) {
         .with_value(U256::from(1))
         .with_nonce(nonce)
         .with_gas_limit(30_000);
+    debug!(?tx, "constructed transaction");
 
-    // start timer to measure how long it takes to mine the transaction
     let dispatch_start_time: Instant = Instant::now();
-
-    // dispatch the transaction
-    debug!(?tx.nonce, "sending transaction with nonce");
     let result = provider.send_transaction(tx).await.unwrap();
+    tracing::Span::current().record("tx_hash", result.tx_hash().to_string());
 
-    // wait for the transaction to mine
-    let receipt = match timeout(Duration::from_secs(240), result.get_receipt()).await {
-        Ok(Ok(receipt)) => receipt,
+    let receipt = match timeout(TRANSACTION_RECEIPT_TIMEOUT, result.get_receipt()).await {
+        Ok(Ok(receipt)) => {
+            tracing::Span::current().record("tx_status", "mined");
+            tracing::Span::current().record("tx_status", receipt.status());
+            info!(?receipt.transaction_hash, "transaction receipt received");
+            debug!(?receipt, "transaction receipt details");
+            receipt
+        }
         Ok(Err(e)) => {
             error!(error = ?e, "failed to get transaction receipt");
             return;
