@@ -108,11 +108,7 @@ async fn send_order(
 
     // sign the order, return it back for comparison
     let signed = send_order.sign_order(order).await?;
-    tracing::Span::current()
-        .record(
-            "signed_order_signature",
-            signed.order_hash().to_string(),
-        );
+    tracing::Span::current().record("signed_order_signature", signed.order_hash().to_string());
     debug!(?signed, "Signed order contents");
 
     // send the signed order to the transaction cache
