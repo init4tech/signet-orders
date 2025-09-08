@@ -1,5 +1,6 @@
 use crate::provider::TxSenderProvider;
 use alloy::{
+    consensus::constants::GWEI_TO_WEI,
     eips::Encodable2718,
     network::TransactionBuilder,
     primitives::Bytes,
@@ -18,8 +19,6 @@ use signet_tx_cache::{client::TxCache, types::TxCacheSendBundleResponse};
 use signet_types::{AggregateOrders, SignedFill, SignedOrder, UnsignedFill};
 use std::{collections::HashMap, slice::from_ref};
 
-/// Multiplier for converting gwei to wei.
-const GWEI_TO_WEI: u64 = 1_000_000_000;
 /// Default gas limit for transactions.
 const DEFAULT_GAS_LIMIT: u64 = 1_000_000;
 /// Default priority fee multiplier for transactions.
