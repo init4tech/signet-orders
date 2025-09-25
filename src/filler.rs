@@ -162,6 +162,7 @@ where
                 replacement_uuid: None, // optional if implementing strategies that replace or cancel bundles
                 ..Default::default()
             },
+            host_txs: vec![],
         };
         debug!(?bundle, "bundle contents");
         info!("forwarding bundle to transaction cache");
