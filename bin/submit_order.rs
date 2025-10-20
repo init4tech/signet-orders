@@ -13,8 +13,7 @@ use orders::{
     order::SendOrder,
     provider::{TxSenderProvider, connect_provider},
 };
-use signet_types::SignedOrder;
-use signet_zenith::RollupOrders::{Input, Order, Output};
+use signet_types::{SignedOrder, UnsignedOrder};
 use tokio::time::{Duration, sleep};
 
 const TX_CACHE_WAIT_TIME: Duration = Duration::from_millis(500);
@@ -63,42 +62,39 @@ async fn main() -> eyre::Result<()> {
 
 /// Constructs an example [`Order`] based on the provided configuration and recipient address.
 /// If `rollup` is true, it creates an order that targets the rollup; otherwise, it creates an order that targets the host chain.
-fn get_example_order(config: &FillerConfig, recipient: Address, rollup: bool) -> Order {
+fn get_example_order(
+    config: &FillerConfig,
+    recipient: Address,
+    rollup: bool,
+) -> UnsignedOrder<'static> {
+    let unsigned = UnsignedOrder::default()
+        .with_input(
+            config.constants.rollup().tokens().weth(),
+            U256::from(GWEI_TO_WEI),
+        )
+        .with_deadline(Utc::now().timestamp() as u64 + (60 * 10));
+
     if rollup {
-        Order {
-            inputs: vec![Input {
-                token: config.constants.rollup().tokens().weth(),
-                amount: U256::from(GWEI_TO_WEI),
-            }],
-            outputs: vec![Output {
-                token: config.constants.rollup().tokens().weth(),
-                amount: U256::from(GWEI_TO_WEI),
-                chainId: config.constants.rollup().chain_id() as u32,
-                recipient,
-            }],
-            deadline: U256::from(Utc::now().timestamp() + (60 * 10)), // 10 minutes from now
-        }
+        unsigned.with_output(
+            config.constants.rollup().tokens().weth(),
+            U256::from(GWEI_TO_WEI),
+            recipient,
+            config.constants.rollup().chain_id() as u32,
+        )
     } else {
-        Order {
-            inputs: vec![Input {
-                token: config.constants.rollup().tokens().weth(),
-                amount: U256::from(GWEI_TO_WEI),
-            }],
-            outputs: vec![Output {
-                token: config.constants.host().tokens().weth(),
-                amount: U256::from(GWEI_TO_WEI),
-                chainId: config.constants.host().chain_id() as u32,
-                recipient,
-            }],
-            deadline: U256::from(Utc::now().timestamp() + (60 * 10)), // 10 minutes from now
-        }
+        unsigned.with_output(
+            config.constants.host().tokens().weth(),
+            U256::from(GWEI_TO_WEI),
+            recipient,
+            config.constants.host().chain_id() as u32,
+        )
     }
 }
 
 /// Sign and send an order to the transaction cache.
 #[instrument(skip(order, signer, config), fields(signer_address = %signer.address()))]
 async fn send_order(
-    order: Order,
+    order: UnsignedOrder<'_>,
     signer: &LocalOrAws,
     config: &FillerConfig,
 ) -> eyre::Result<SignedOrder> {
@@ -107,7 +103,8 @@ async fn send_order(
     let send_order = SendOrder::new(signer.clone(), config.constants.clone())?;
 
     // sign the order, return it back for comparison
-    let signed = send_order.sign_order(order).await?;
+    let signed = order.sign(signer).await?;
+
     tracing::Span::current().record("signed_order_signature", signed.order_hash().to_string());
     debug!(?signed, "Signed order contents");
 

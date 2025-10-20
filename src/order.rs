@@ -1,5 +1,5 @@
 use alloy::signers::Signer;
-use eyre::Error;
+use eyre::Result;
 use init4_bin_base::deps::tracing::{debug, instrument};
 use signet_constants::SignetConstants;
 use signet_tx_cache::client::TxCache;
@@ -22,7 +22,7 @@ where
     S: Signer,
 {
     /// Create a new SendOrder instance.
-    pub fn new(signer: S, constants: SignetConstants) -> Result<Self, Error> {
+    pub fn new(signer: S, constants: SignetConstants) -> Result<Self> {
         let tx_cache_url: reqwest::Url = constants.environment().transaction_cache().parse()?;
         let client = reqwest::ClientBuilder::new().use_rustls_tls().build()?;
 
@@ -39,14 +39,14 @@ where
     }
 
     /// Sign an Order and forward it to the transaction cache to be Filled.
-    pub async fn sign_and_send_order(&self, order: Order) -> Result<(), Error> {
+    pub async fn sign_and_send_order(&self, order: Order) -> Result<()> {
         let signed = self.sign_order(order).await?;
         self.send_order(signed).await
     }
 
     /// Sign an Order.
     #[instrument(skip(self, order))]
-    pub async fn sign_order(&self, order: Order) -> Result<SignedOrder, Error> {
+    pub async fn sign_order(&self, order: Order) -> Result<SignedOrder> {
         debug!(?order, "Signing order");
 
         // make an UnsignedOrder from the Order
@@ -54,10 +54,7 @@ where
 
         // sign it
         unsigned
-            .with_chain(
-                self.constants.rollup().chain_id(),
-                self.constants.rollup().orders(),
-            )
+            .with_chain(self.constants.system())
             .sign(&self.signer)
             .await
             .map_err(Into::into)
@@ -65,7 +62,7 @@ where
 
     /// Forward a SignedOrder to the transaction cache.
     #[instrument(skip(self, signed))]
-    pub async fn send_order(&self, signed: SignedOrder) -> Result<(), Error> {
+    pub async fn send_order(&self, signed: SignedOrder) -> Result<()> {
         // send the SignedOrder to the transaction cache
         debug!(order = ?signed, "Forwarding signed order to transaction cache");
         self.tx_cache.forward_order(signed).await
