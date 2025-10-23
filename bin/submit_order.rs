@@ -103,7 +103,10 @@ async fn send_order(
     let send_order = SendOrder::new(signer.clone(), config.constants.clone())?;
 
     // sign the order, return it back for comparison
-    let signed = order.sign(signer).await?;
+    let signed = order
+        .with_chain(config.constants.system())
+        .sign(signer)
+        .await?;
 
     tracing::Span::current().record("signed_order_signature", signed.order_hash().to_string());
     debug!(?signed, "Signed order contents");
