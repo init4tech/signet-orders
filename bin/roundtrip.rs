@@ -40,7 +40,7 @@ async fn main() -> eyre::Result<()> {
     let provider = connect_provider(signer.clone(), config.ru_rpc_url.clone()).await?;
     info!(signer_address = %signer.address(), "Connected to Signer and Provider");
 
-    // create an example order swapping 1 rollup USDC for 1 host USDC
+    // create an example order
     let example_order = get_example_order(&config, signer.address(), args.rollup);
 
     // sign & send the order to the transaction cache
@@ -53,7 +53,7 @@ async fn main() -> eyre::Result<()> {
 
     // fill the order from the transaction cache
     fill_orders(&signed, signer, provider, config).await?;
-    info!("Order filled successfully");
+    info!("Bundle sent to tx cache successfully; wait for bundle to mine.");
 
     Ok(())
 }
@@ -101,7 +101,10 @@ async fn send_order(
     let send_order = SendOrder::new(signer.clone(), config.constants.clone())?;
 
     // sign the order, return it back for comparison
-    let signed = order.sign(signer).await?;
+    let signed = order
+        .with_chain(config.constants.system())
+        .sign(signer)
+        .await?;
 
     // send the signed order to the transaction cache
     send_order.send_order(signed.clone()).await?;
