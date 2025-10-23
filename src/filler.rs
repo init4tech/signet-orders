@@ -283,6 +283,10 @@ where
 
             // encode it
             let encoded = filled.encoded_2718();
+            info!(
+                tx_hash = filled.hash().to_string(),
+                "Rollup transaction signed and encoded"
+            );
 
             // add to array
             encoded_txs.push(Bytes::from(encoded));
