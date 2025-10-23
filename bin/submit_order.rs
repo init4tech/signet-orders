@@ -142,7 +142,7 @@ async fn fill_orders(
     // fill each individually
     filler.fill_individually(orders.as_slice()).await?;
 
-    info!("Order filled successfully");
+    info!("Bundle sent to tx cache successfully; wait for bundle to mine.");
 
     Ok(())
 }

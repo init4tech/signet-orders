@@ -53,7 +53,7 @@ async fn main() -> eyre::Result<()> {
 
     // fill the order from the transaction cache
     fill_orders(&signed, signer, provider, config).await?;
-    info!("Order filled successfully");
+    info!("Bundle sent to tx cache successfully; wait for bundle to mine.");
 
     Ok(())
 }
