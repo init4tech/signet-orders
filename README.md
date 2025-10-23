@@ -2,6 +2,8 @@
 
 This repository provides example code for **placing and filling Orders** on Signet, built using utilities from [signet-sdk](https://github.com/init4tech/signet-sdk).
 
+The repo is intended to _illustrate_ how Fillers can interact with the Signet SDK in order to build Filler software. It is a set of demos and examples; it is not a full-service, out-of-the-box, production-ready Filler. 
+
 ---
 
 ## Fillers
@@ -16,6 +18,7 @@ The `Filler` struct demonstrates the basic steps required to **fill Signet Order
 ### Missing Components
 In production, a Filler will need to:
 
+- Add **scaffolding** around the the Filler logic to run on a perpetual basis. 
 - Implement custom **business logic** to determine which Orders to fill.  
 - Potentially extend the example logic with **advanced strategies**, such as performing swaps to source liquidity between fills.
 
@@ -114,6 +117,9 @@ Et voilà! 🎉
 ---
 
 ### Troubleshooting
-Signet Bundles are tied to a **specific block**.  
-If your Bundle is not included in that block, it will **not** mine in later blocks.  
-Simply re-run the script to retry.
+Signet Bundles target one **specific block number**.
+If a Bundle is not included in that exact block, it won't be “retried” in subsequent blocks.
+
+The current example script naively sends each Bundle to one single target block. When running the example, if Bundles are not mining, it is possible that they were simply not included in the target block. A naive solution is to simply re-run the script to try submitting a new Bundle. 
+
+More robust, production-ready software should include bespoke business logic to continually run the Filler logic, such that Bundles are perpetually (re)submitted on a block-by-block basis. 
