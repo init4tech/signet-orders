@@ -40,7 +40,7 @@ async fn main() -> eyre::Result<()> {
     let provider = connect_provider(signer.clone(), config.ru_rpc_url.clone()).await?;
     info!(signer_address = %signer.address(), "Connected to Signer and Provider");
 
-    // create an example order swapping 1 rollup USDC for 1 host USDC
+    // create an example order
     let example_order = get_example_order(&config, signer.address(), args.rollup);
 
     // sign & send the order to the transaction cache
