@@ -71,8 +71,8 @@ You can freely modify the example Order to:
 ```bash
 export CHAIN_NAME=pecorino
 export RU_RPC_URL=https://rpc.pecorino.signet.sh/
+export HOST_RPC_URL=https://host-rpc.pecorino.signet.sh/
 export SIGNER_KEY=[AWS KMS key ID or local private key]
-export SIGNER_CHAIN_ID=14174
 ```
 
 2. **Fund your key**  
@@ -82,6 +82,7 @@ This key acts as **both** the Order Initiator and Filler, and must be funded wit
 - Input tokens on the Rollup  
 - Output tokens on the Host and/or Rollup  
 - Gas tokens to pay for Rollup transactions
+- Gas tokens to pay for Host transactions
 
 By default, the example swaps **1 Rollup WETH Input → 1 Host WETH Output**, but you can edit the Order freely.
 

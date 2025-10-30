@@ -15,7 +15,7 @@ use init4_bin_base::{
 };
 use signet_bundle::SignetEthBundle;
 use signet_constants::SignetConstants;
-use signet_tx_cache::{client::TxCache, types::TxCacheSendBundleResponse};
+use signet_tx_cache::client::TxCache;
 use signet_types::{AggregateOrders, SignedFill, SignedOrder, UnsignedFill};
 use std::{collections::HashMap, slice::from_ref};
 
@@ -30,9 +30,12 @@ pub struct FillerConfig {
     /// The Rollup RPC URL.
     #[from_env(var = "RU_RPC_URL", desc = "RPC URL for the Rollup")]
     pub ru_rpc_url: String,
-    /// The signer to use for signing transactions.
-    /// NOTE: For the example, this key must be funded with USDC on both the Host and Rollup, as well as gas on the Rollup.
-    /// .env vars: SIGNER_KEY, SIGNER_CHAIN_ID
+    /// The Host RPC URL.
+    #[from_env(var = "HOST_RPC_URL", desc = "RPC URL for the Host")]
+    pub host_rpc_url: String,
+    /// The signer to use for signing transactions on the Host and Rollup.
+    /// NOTE: For the example, this key must be funded with gas on both the Host and Rollup, as well as Input/Output tokens for the Orders on the Host/Rollup.
+    /// .env var: SIGNER_KEY
     pub signer_config: LocalOrAwsConfig,
     /// The Signet constants.
     /// .env var: CHAIN_NAME
@@ -47,6 +50,8 @@ pub struct Filler<S: Signer> {
     signer: S,
     /// The provider to use for building transactions on the Rollup.
     ru_provider: TxSenderProvider,
+    /// The provider to use for building transactions on the Host.
+    host_provider: TxSenderProvider,
     /// The transaction cache endpoint.
     tx_cache: TxCache,
     /// The system constants.
@@ -61,6 +66,7 @@ where
     pub fn new(
         signer: S,
         ru_provider: TxSenderProvider,
+        host_provider: TxSenderProvider,
         constants: SignetConstants,
     ) -> Result<Self, Error> {
         let tx_cache_url: reqwest::Url = constants.environment().transaction_cache().parse()?;
@@ -74,6 +80,7 @@ where
         Ok(Self {
             signer,
             ru_provider,
+            host_provider,
             tx_cache: TxCache::new_with_client(tx_cache_url, client),
             constants,
         })
@@ -101,8 +108,7 @@ where
 
         // submit one bundle per individual order
         for order in orders {
-            let response = self.fill(from_ref(order)).await?;
-            debug!(bundle_id = response.id.to_string(), "Bundle sent to cache");
+            self.fill(from_ref(order)).await?;
         }
 
         Ok(())
@@ -122,7 +128,7 @@ where
     /// Filling Orders individually ensures that even if some Orders are not fillable, others may still mine;
     /// however, it is less gas efficient.
     #[instrument(skip(self, orders))]
-    pub async fn fill(&self, orders: &[SignedOrder]) -> Result<TxCacheSendBundleResponse, Error> {
+    pub async fn fill(&self, orders: &[SignedOrder]) -> Result<(), Error> {
         info!(orders_count = orders.len(), "Filling orders in bundle");
 
         // if orders is empty, error out
@@ -131,28 +137,36 @@ where
         }
 
         // sign a SignedFill for the orders
-        let mut signed_fills: HashMap<u64, SignedFill> = self.sign_fills(orders).await?;
+        let signed_fills: HashMap<u64, SignedFill> = self.sign_fills(orders).await?;
         debug!(?signed_fills, "Signed fills for orders");
         info!("Successfully signed fills");
 
         // get the transaction requests for the rollup
         let tx_requests = self.rollup_txn_requests(&signed_fills, orders).await?;
-        debug!(?tx_requests, "Transaction requests");
+        debug!(?tx_requests, "Rollup transaction requests");
 
-        // sign & encode the transactions for the Bundle
-        let txs = self.sign_and_encode_txns(tx_requests).await?;
-        debug!(?txs, "Encoded transactions");
+        // sign & encode the rollup transactions for the Bundle
+        let txs: Vec<Bytes> = self
+            .sign_and_encode_txns(&self.ru_provider, tx_requests)
+            .await?;
+        debug!(?txs, "Rollup encoded transactions");
 
-        // get the aggregated host fill for the Bundle, if any
-        let host_fills = signed_fills.remove(&self.constants.host().chain_id());
-        debug!(?host_fills, "Host fills for bundle");
+        // get the transaction requests for the host
+        let host_tx_requests = self.host_txn_requests(&signed_fills).await?;
+        debug!(?host_tx_requests, "Host transaction requests");
+
+        // sign & encode the host transactions for the Bundle
+        let host_txs = self
+            .sign_and_encode_txns(&self.host_provider, host_tx_requests)
+            .await?;
+        debug!(?host_txs, "Host encoded transactions");
 
         // set the Bundle to only be valid if mined in the next rollup block
         let block_number = self.ru_provider.get_block_number().await? + 1;
 
         // construct a Bundle containing the Rollup transactions and the Host fill (if any)
         let bundle = SignetEthBundle {
-            host_fills,
+            host_fills: None,
             bundle: EthSendBundle {
                 txs,
                 reverting_tx_hashes: vec![], // generally, if the Order initiations revert, then fills should not be submitted
@@ -162,13 +176,21 @@ where
                 replacement_uuid: None, // optional if implementing strategies that replace or cancel bundles
                 ..Default::default()
             },
-            host_txs: vec![],
+            host_txs,
         };
         debug!(?bundle, "bundle contents");
-        info!("forwarding bundle to transaction cache");
+        info!(
+            ru_tx_count = bundle.bundle.txs.len(),
+            host_tx_count = bundle.host_txs.len(),
+            target_ru_block_number = block_number,
+            "forwarding bundle to transaction cache"
+        );
 
         // submit the Bundle to the transaction cache
-        self.tx_cache.forward_bundle(bundle).await
+        let response = self.tx_cache.forward_bundle(bundle).await?;
+        debug!(bundle_id = response.id.to_string(), "Bundle sent to cache");
+
+        Ok(())
     }
 
     /// Aggregate the given orders into a SignedFill, sign it, and
@@ -243,6 +265,7 @@ where
         // Host `fill` transactions are always considered to be mined "before" the rollup block is processed,
         // but Rollup `fill` transactions MUST take care to be ordered before the Orders are `initiate`d
         if let Some(rollup_fill) = signed_fills.get(&self.constants.rollup().chain_id()) {
+            debug!(?rollup_fill, "Rollup fill");
             // add the fill tx to the rollup txns
             let ru_fill_tx = rollup_fill.to_fill_tx(self.constants.rollup().orders());
             tx_requests.push(ru_fill_tx);
@@ -259,11 +282,37 @@ where
         Ok(tx_requests)
     }
 
+    /// Construct a set of transaction requests to be submitted on the host.
+    ///
+    /// This example only includes one Host transaction,
+    /// which performs a single, aggregate Fill on the Host chain.
+    ///
+    /// This is the simplest, minimally viable way to get a set of Orders mined;
+    /// Fillers may wish to implement more complex strategies.
+    ///
+    /// For example, Fillers might wish to include swaps on Host AMMs to source liquidity as part of their filling strategy.
+    #[instrument(skip(self, signed_fills))]
+    async fn host_txn_requests(
+        &self,
+        signed_fills: &HashMap<u64, SignedFill>,
+    ) -> Result<Vec<TransactionRequest>, Error> {
+        // If there is a SignedFill for the Host, add a transaction to submit the fill
+        if let Some(host_fill) = signed_fills.get(&self.constants.host().chain_id()) {
+            debug!(?host_fill, "Host fill");
+            // add the fill tx to the host txns
+            let host_fill_tx = host_fill.to_fill_tx(self.constants.host().orders());
+            Ok(vec![host_fill_tx])
+        } else {
+            Ok(vec![])
+        }
+    }
+
     /// Given an ordered set of Transaction Requests,
     /// Sign them and encode them for inclusion in a Bundle.
-    #[instrument(skip(self, tx_requests))]
+    #[instrument(skip(self, provider, tx_requests))]
     pub async fn sign_and_encode_txns(
         &self,
+        provider: &TxSenderProvider,
         tx_requests: Vec<TransactionRequest>,
     ) -> Result<Vec<Bytes>, Error> {
         let mut encoded_txs: Vec<Bytes> = Vec::new();
@@ -277,7 +326,7 @@ where
                 );
 
             // sign the transaction
-            let SendableTx::Envelope(filled) = self.ru_provider.fill(tx).await? else {
+            let SendableTx::Envelope(filled) = provider.fill(tx).await? else {
                 eyre::bail!("Failed to fill transaction")
             };
 
@@ -285,7 +334,8 @@ where
             let encoded = filled.encoded_2718();
             info!(
                 tx_hash = filled.hash().to_string(),
-                "Rollup transaction signed and encoded"
+                chain_id = provider.get_chain_id().await?,
+                "Transaction signed and encoded"
             );
 
             // add to array
