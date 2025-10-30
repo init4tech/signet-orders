@@ -36,8 +36,12 @@ async fn main() -> eyre::Result<()> {
     let args = OrdersArgs::parse();
 
     // connect signer and provider
-    let signer = config.signer_config.connect().await?;
-    let provider = connect_provider(signer.clone(), config.ru_rpc_url.clone()).await?;
+    let mut signer = config.signer_config.connect().await?;
+    // ensure signer chain ID is unset so it can be used for Host and Rollup
+    signer.set_chain_id(None);
+
+    let ru_provider = connect_provider(signer.clone(), config.ru_rpc_url.clone()).await?;
+    let host_provider = connect_provider(signer.clone(), config.host_rpc_url.clone()).await?;
     info!(signer_address = %signer.address(), "Connected to Signer and Provider");
 
     // create an example order
@@ -52,7 +56,7 @@ async fn main() -> eyre::Result<()> {
     sleep(Duration::from_secs(1)).await;
 
     // fill the order from the transaction cache
-    fill_orders(&signed, signer, provider, config).await?;
+    fill_orders(&signed, signer, ru_provider, host_provider, config).await?;
     info!("Bundle sent to tx cache successfully; wait for bundle to mine.");
 
     Ok(())
@@ -113,15 +117,19 @@ async fn send_order(
 }
 
 /// Fill example [`SignedOrder`]s from the transaction cache.
-#[instrument(skip(target_order, signer, provider, config), level = "debug")]
+#[instrument(
+    skip(target_order, signer, ru_provider, host_provider, config),
+    level = "debug"
+)]
 async fn fill_orders(
     target_order: &SignedOrder,
     signer: LocalOrAws,
-    provider: TxSenderProvider,
+    ru_provider: TxSenderProvider,
+    host_provider: TxSenderProvider,
     config: FillerConfig,
 ) -> eyre::Result<()> {
     info!("filling orders from transaction cache");
-    let filler = Filler::new(signer, provider, config.constants)?;
+    let filler = Filler::new(signer, ru_provider, host_provider, config.constants)?;
 
     // get all the [`SignedOrder`]s from tx cache
     let mut orders: Vec<SignedOrder> = filler.get_orders().await?;

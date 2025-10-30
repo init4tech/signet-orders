@@ -42,8 +42,12 @@ async fn main() -> eyre::Result<()> {
         sleep_time,
     } = OrdersArgs::from_env()?;
 
-    let signer = config.signer_config.connect().await?;
-    let provider = connect_provider(signer.clone(), config.ru_rpc_url.clone()).await?;
+    let mut signer = config.signer_config.connect().await?;
+    // ensure signer chain ID is unset so it can be used for Host and Rollup
+    signer.set_chain_id(None);
+
+    let ru_provider = connect_provider(signer.clone(), config.ru_rpc_url.clone()).await?;
+    let host_provider = connect_provider(signer.clone(), config.host_rpc_url.clone()).await?;
     info!(signer_address = %signer.address(), "Connected to Signer and Provider");
 
     loop {
@@ -54,7 +58,14 @@ async fn main() -> eyre::Result<()> {
 
         sleep(TX_CACHE_WAIT_TIME).await;
 
-        fill_orders(&signed, signer.clone(), provider.clone(), &config).await?;
+        fill_orders(
+            &signed,
+            signer.clone(),
+            ru_provider.clone(),
+            host_provider.clone(),
+            &config,
+        )
+        .await?;
 
         sleep(Duration::from_millis(sleep_time)).await;
     }
@@ -119,15 +130,16 @@ async fn send_order(
 }
 
 /// Fill example [`SignedOrder`]s from the transaction cache.
-#[instrument(skip(target_order, signer, provider, config), fields(target_order_signature = %target_order.permit.signature, target_order_owner = %target_order.permit.owner))]
+#[instrument(skip(target_order, signer, ru_provider, host_provider, config), fields(target_order_signature = %target_order.permit.signature, target_order_owner = %target_order.permit.owner))]
 async fn fill_orders(
     target_order: &SignedOrder,
     signer: LocalOrAws,
-    provider: TxSenderProvider,
+    ru_provider: TxSenderProvider,
+    host_provider: TxSenderProvider,
     config: &FillerConfig,
 ) -> eyre::Result<()> {
     info!("filling orders from transaction cache");
-    let filler = Filler::new(signer, provider, config.constants.clone())?;
+    let filler = Filler::new(signer, ru_provider, host_provider, config.constants.clone())?;
 
     // get all the [`SignedOrder`]s from tx cache
     let mut orders: Vec<SignedOrder> = filler.get_orders().await?;
