@@ -162,27 +162,36 @@ where
         debug!(?host_txs, "Host encoded transactions");
 
         // set the Bundle to only be valid if mined in the next rollup block
-        let block_number = self.ru_provider.get_block_number().await? + 1;
+        let latest_ru_block_number = self.ru_provider.get_block_number().await?;
 
+        // send the Bundle to the transaction cache
+        self.send_bundle(txs.clone(), host_txs.clone(), latest_ru_block_number + 1)
+            .await?;
+
+        Ok(())
+    }
+
+    async fn send_bundle(
+        &self,
+        ru_txs: Vec<Bytes>,
+        host_txs: Vec<Bytes>,
+        target_ru_block_number: u64,
+    ) -> Result<(), Error> {
         // construct a Bundle containing the Rollup transactions and the Host fill (if any)
         let bundle = SignetEthBundle {
             host_fills: None,
+            host_txs,
             bundle: EthSendBundle {
-                txs,
-                reverting_tx_hashes: vec![], // generally, if the Order initiations revert, then fills should not be submitted
-                block_number,
-                min_timestamp: None, // sufficiently covered by pinning to next block number
-                max_timestamp: None, // sufficiently covered by pinning to next block number
-                replacement_uuid: None, // optional if implementing strategies that replace or cancel bundles
+                txs: ru_txs,
+                block_number: target_ru_block_number,
                 ..Default::default()
             },
-            host_txs,
         };
         debug!(?bundle, "bundle contents");
         info!(
             ru_tx_count = bundle.bundle.txs.len(),
             host_tx_count = bundle.host_txs.len(),
-            target_ru_block_number = block_number,
+            target_ru_block_number,
             "forwarding bundle to transaction cache"
         );
 
