@@ -179,7 +179,6 @@ where
     ) -> Result<(), Error> {
         // construct a Bundle containing the Rollup transactions and the Host fill (if any)
         let bundle = SignetEthBundle {
-            host_fills: None,
             host_txs,
             bundle: EthSendBundle {
                 txs: ru_txs,
@@ -233,19 +232,9 @@ where
         let mut unsigned_fill = UnsignedFill::from(&agg);
         unsigned_fill = unsigned_fill
             .with_deadline(deadline)
-            .with_ru_chain_id(self.constants.rollup().chain_id());
+            .with_ru_chain_id(self.constants.rollup().chain_id())
+            .with_chain(self.constants.system().clone());
         debug!(?unsigned_fill, "Unsigned fill created");
-        // populate the Order contract addresses for each chain
-        for chain_id in agg.target_chain_ids() {
-            unsigned_fill = unsigned_fill.with_chain(
-                chain_id,
-                self.constants
-                    .system()
-                    .orders_for(chain_id)
-                    .ok_or(eyre!("invalid target chain id {}", chain_id))?,
-            );
-        }
-        debug!(?unsigned_fill, "Unsigned fill with chain addresses");
         // sign the UnsignedFill, producing a SignedFill for each target chain
         Ok(unsigned_fill.sign(&self.signer).await?)
     }
