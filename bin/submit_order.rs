@@ -103,7 +103,7 @@ fn get_example_order(
 }
 
 /// Sign and send an order to the transaction cache.
-#[instrument(skip(order, signer, config), fields(signer_address = %signer.address()))]
+#[instrument(skip_all, fields(signer_address = %signer.address()))]
 async fn send_order(
     order: UnsignedOrder<'_>,
     signer: &LocalOrAws,
@@ -130,7 +130,7 @@ async fn send_order(
 }
 
 /// Fill example [`SignedOrder`]s from the transaction cache.
-#[instrument(skip(target_order, signer, ru_provider, host_provider, config), fields(target_order_signature = %target_order.permit.signature, target_order_owner = %target_order.permit.owner))]
+#[instrument(skip_all, fields(target_order_signature = %target_order.permit.signature, target_order_owner = %target_order.permit.owner))]
 async fn fill_orders(
     target_order: &SignedOrder,
     signer: LocalOrAws,

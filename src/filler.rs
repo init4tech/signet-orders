@@ -102,7 +102,7 @@ where
     /// without simulating to check whether it has already been filled, because they can rely on Builder simulation.
     /// Order `initiate` transactions will revert if the Order has already been filled,
     /// in which case the entire Bundle would simply be discarded by the Builder.
-    #[instrument(skip(self, orders))]
+    #[instrument(skip_all)]
     pub async fn fill_individually(&self, orders: &[SignedOrder]) -> Result<(), Error> {
         debug!(orders_count = orders.len(), "Filling orders individually");
 
@@ -127,7 +127,7 @@ where
     /// If a single Order is passed to this fn,
     /// Filling Orders individually ensures that even if some Orders are not fillable, others may still mine;
     /// however, it is less gas efficient.
-    #[instrument(skip(self, orders))]
+    #[instrument(skip_all)]
     pub async fn fill(&self, orders: &[SignedOrder]) -> Result<(), Error> {
         info!(orders_count = orders.len(), "Filling orders in bundle");
 
@@ -212,7 +212,7 @@ where
     /// If filling multiple Orders, they may wish to utilize one Order's Outputs to provide another Order's rollup Inputs.
     /// In this case, the Filler would wish to split up the Fills for each Order,
     /// rather than signing a single, aggregate a Fill for each chain, as is done here.
-    #[instrument(skip(self, orders))]
+    #[instrument(skip_all, fields(orders_count = orders.len()))]
     async fn sign_fills(&self, orders: &[SignedOrder]) -> Result<HashMap<u64, SignedFill>, Error> {
         if orders.is_empty() {
             eyre::bail!("no orders to fill");
@@ -249,7 +249,7 @@ where
     ///
     /// For example, Fillers might utilize one Order's Inputs to fill subsequent Orders' Outputs.
     /// In this case, the rollup transactions should look like [`fill_1`, `inititate_1`, `fill_2`, `initiate_2`].
-    #[instrument(skip(self, signed_fills, orders))]
+    #[instrument(skip_all)]
     async fn rollup_txn_requests(
         &self,
         signed_fills: &HashMap<u64, SignedFill>,
@@ -289,7 +289,7 @@ where
     /// Fillers may wish to implement more complex strategies.
     ///
     /// For example, Fillers might wish to include swaps on Host AMMs to source liquidity as part of their filling strategy.
-    #[instrument(skip(self, signed_fills))]
+    #[instrument(skip_all)]
     async fn host_txn_requests(
         &self,
         signed_fills: &HashMap<u64, SignedFill>,
@@ -307,7 +307,7 @@ where
 
     /// Given an ordered set of Transaction Requests,
     /// Sign them and encode them for inclusion in a Bundle.
-    #[instrument(skip(self, provider, tx_requests))]
+    #[instrument(skip_all)]
     pub async fn sign_and_encode_txns(
         &self,
         provider: &TxSenderProvider,
