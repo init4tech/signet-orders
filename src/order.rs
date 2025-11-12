@@ -39,16 +39,15 @@ where
     }
 
     /// Sign an Order and forward it to the transaction cache to be Filled.
+    #[instrument(skip_all)]
     pub async fn sign_and_send_order(&self, order: Order) -> Result<()> {
         let signed = self.sign_order(order).await?;
         self.send_order(signed).await
     }
 
     /// Sign an Order.
-    #[instrument(skip(self, order))]
+    #[instrument(skip_all, level = "debug")]
     pub async fn sign_order(&self, order: Order) -> Result<SignedOrder> {
-        debug!(?order, "Signing order");
-
         // make an UnsignedOrder from the Order
         let unsigned = UnsignedOrder::from(&order);
 
@@ -58,13 +57,16 @@ where
             .sign(&self.signer)
             .await
             .map_err(Into::into)
+            .inspect(|signed_order| {
+                debug!(order_hash = %signed_order.order_hash(), "Order signed");
+            })
     }
 
     /// Forward a SignedOrder to the transaction cache.
-    #[instrument(skip(self, signed))]
+    #[instrument(skip_all, fields(order_hash = %signed.order_hash()))]
     pub async fn send_order(&self, signed: SignedOrder) -> Result<()> {
         // send the SignedOrder to the transaction cache
-        debug!(order = ?signed, "Forwarding signed order to transaction cache");
+        debug!("Forwarding signed order to transaction cache");
         self.tx_cache.forward_order(signed).await
     }
 }
