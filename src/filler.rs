@@ -165,8 +165,10 @@ where
         let latest_ru_block_number = self.ru_provider.get_block_number().await?;
 
         // send the Bundle to the transaction cache
-        self.send_bundle(txs.clone(), host_txs.clone(), latest_ru_block_number + 1)
-            .await?;
+        for i in 1..11 {
+            self.send_bundle(txs.clone(), host_txs.clone(), latest_ru_block_number + i)
+                .await?;
+        }
 
         Ok(())
     }
