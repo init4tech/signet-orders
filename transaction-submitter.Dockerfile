@@ -22,15 +22,15 @@ FROM chef as builder
 COPY --from=planner /app/recipe.json recipe.json
 RUN apt-get update && apt-get -y upgrade && apt-get install -y gcc libclang-dev pkg-config libssl-dev
 
-RUN --mount=type=ssh cargo chef cook --release --recipe-path recipe.json --bin transaction-submitter 
+RUN --mount=type=ssh cargo chef cook --release --recipe-path recipe.json --bin submit_transaction 
 COPY --exclude=target . .
 
-RUN --mount=type=ssh cargo build --release --bin transaction-submitter
+RUN --mount=type=ssh cargo build --release --bin submit_transaction
 
 # Stage 3: Final image for running in the env
 FROM --platform=$TARGETPLATFORM debian:bookworm-slim
 RUN apt-get update && apt-get -y upgrade && apt-get install -y libssl-dev ca-certificates 
 
-COPY --from=builder /app/target/release/transaction-submitter /usr/local/bin/transaction-submitter
+COPY --from=builder /app/target/release/submit_transaction /usr/local/bin/submit_transaction
 
-ENTRYPOINT [ "/usr/local/bin/transaction-submitter" ]
+ENTRYPOINT [ "/usr/local/bin/submit_transaction" ]
