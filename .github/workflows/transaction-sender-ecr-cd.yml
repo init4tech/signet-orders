@@ -18,7 +18,7 @@ jobs:
   docker-ecr-push:
     uses: init4tech/actions/.github/workflows/ecr-build-and-push.yml@main
     with:
-      rust-binary-name: transaction-submitter
+      rust-binary-name: submit_transaction
       environment: dev
       dockerfile-path: transaction-submitter.Dockerfile
     secrets:
