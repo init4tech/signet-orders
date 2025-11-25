@@ -161,7 +161,7 @@ where
             .await?;
         debug!(?host_txs, "Host encoded transactions");
 
-        // set the Bundle to only be valid if mined in the next rollup block
+        // get current rollup block to determine the subsequent target block(s) for Bundle
         let latest_ru_block_number = self.ru_provider.get_block_number().await?;
 
         // send the Bundle to the transaction cache
