@@ -72,7 +72,7 @@ where
         let tx_cache_url: reqwest::Url = constants.environment().transaction_cache().parse()?;
         let client = reqwest::ClientBuilder::new().use_rustls_tls().build()?;
 
-        debug!(
+        info!(
             tx_cache_url = tx_cache_url.as_str(),
             "Connecting to transaction cache"
         );
@@ -88,7 +88,11 @@ where
 
     /// Query the transaction cache to get all possible orders.
     pub async fn get_orders(&self) -> Result<Vec<SignedOrder>, Error> {
-        self.tx_cache.get_orders().await
+        debug!("Querying transaction cache for orders");
+        let resp = self.tx_cache.get_orders(None).await?;
+        let orders = resp.into_inner().orders.clone();
+        info!(orders_count = orders.len(), "Retrieved orders from cache");
+        Ok(orders)
     }
 
     /// Fills Orders individually, by submitting a separate Bundle for each Order.
@@ -200,7 +204,7 @@ where
 
         // submit the Bundle to the transaction cache
         let response = self.tx_cache.forward_bundle(bundle).await?;
-        debug!(bundle_id = response.id.to_string(), "Bundle sent to cache");
+        info!(bundle_id = response.id.to_string(), "Bundle sent to cache");
 
         Ok(())
     }
@@ -222,7 +226,7 @@ where
             eyre::bail!("no orders to fill");
         }
         let deadline = orders[0]
-            .permit
+            .permit()
             .permit
             .deadline
             .to_string()
@@ -236,7 +240,6 @@ where
         let mut unsigned_fill = UnsignedFill::from(&agg);
         unsigned_fill = unsigned_fill
             .with_deadline(deadline)
-            .with_ru_chain_id(self.constants.rollup().chain_id())
             .with_chain(self.constants.system().clone());
         debug!(?unsigned_fill, "Unsigned fill created");
         // sign the UnsignedFill, producing a SignedFill for each target chain
