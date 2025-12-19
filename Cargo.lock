@@ -5425,6 +5425,7 @@ dependencies = [
  "chrono",
  "clap",
  "eyre",
+ "futures",
  "init4-bin-base",
  "reqwest",
  "signet-bundle",

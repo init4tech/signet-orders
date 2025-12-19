@@ -45,18 +45,18 @@ async fn main() -> eyre::Result<()> {
     info!(signer_address = %signer.address(), "Connected to Signer and Provider");
 
     // create an example order
-    let example_order = get_example_order(&config, signer.address(), args.rollup);
+    let example_order = new_order(&config, signer.address(), args.rollup);
 
     // sign & send the order to the transaction cache
-    let signed = send_order(example_order, &signer, &config).await?;
-    debug!(?signed, "Order contents");
+    let target_signed_order = send_order(example_order, &signer, &config).await?;
+    debug!(?target_signed_order, "Order contents");
     info!("Order signed and sent to transaction cache");
 
     // wait ~1 sec to ensure order is in cache
     sleep(Duration::from_secs(1)).await;
 
     // fill the order from the transaction cache
-    fill_orders(&signed, signer, ru_provider, host_provider, config).await?;
+    fill_orders(&target_signed_order, signer, ru_provider, host_provider, config).await?;
     info!("Bundle sent to tx cache successfully; wait for bundle to mine.");
 
     Ok(())
@@ -64,7 +64,7 @@ async fn main() -> eyre::Result<()> {
 
 /// Constructs an example [`Order`] based on the provided configuration and recipient address.
 /// If `rollup` is true, it creates an order that targets the rollup; otherwise, it creates an order that targets the host chain.
-fn get_example_order(
+fn new_order(
     config: &FillerConfig,
     recipient: Address,
     rollup: bool,
@@ -77,19 +77,23 @@ fn get_example_order(
         .with_deadline(Utc::now().timestamp() as u64 + (60 * 10));
 
     if rollup {
-        unsigned.with_output(
+        let unsigned = unsigned.with_output(
             config.constants.rollup().tokens().weth(),
             U256::from(GWEI_TO_WEI),
             recipient,
             config.constants.rollup().chain_id() as u32,
-        )
+        );
+        info!(unsigned = ?unsigned.clone(), "Constructed new unsigned order");
+        unsigned
     } else {
-        unsigned.with_output(
+        let unsigned = unsigned.clone().with_output(
             config.constants.host().tokens().weth(),
             U256::from(GWEI_TO_WEI),
             recipient,
             config.constants.host().chain_id() as u32,
-        )
+        );
+        info!(unsigned = ?unsigned.clone(), "Constructed new unsigned order");
+        unsigned
     }
 }
 

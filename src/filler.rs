@@ -3,12 +3,13 @@ use alloy::{
     consensus::constants::GWEI_TO_WEI,
     eips::Encodable2718,
     network::TransactionBuilder,
-    primitives::Bytes,
-    providers::{Provider, SendableTx},
+    primitives::{Bytes, TxHash},
+    providers::{PendingTransactionConfig, Provider, SendableTx},
     rpc::types::{TransactionRequest, mev::EthSendBundle},
     signers::Signer,
 };
 use eyre::{Error, eyre};
+use futures::future::try_join_all;
 use init4_bin_base::{
     deps::tracing::{debug, info, instrument},
     utils::{from_env::FromEnv, signer::LocalOrAwsConfig},
@@ -17,7 +18,7 @@ use signet_bundle::SignetEthBundle;
 use signet_constants::SignetConstants;
 use signet_tx_cache::client::TxCache;
 use signet_types::{AggregateOrders, SignedFill, SignedOrder, UnsignedFill};
-use std::{collections::HashMap, slice::from_ref};
+use std::{collections::HashMap, slice::from_ref, time::Duration};
 
 /// Default gas limit for transactions.
 const DEFAULT_GAS_LIMIT: u64 = 1_000_000;
@@ -150,31 +151,36 @@ where
         debug!(?tx_requests, "Rollup transaction requests");
 
         // sign & encode the rollup transactions for the Bundle
-        let txs: Vec<Bytes> = self
-            .sign_and_encode_txns(&self.ru_provider, tx_requests)
-            .await?;
-        debug!(?txs, "Rollup encoded transactions");
+        let rollup_signed = self.sign_and_encode_txns(&self.ru_provider, tx_requests).await?;
+        let ru_hashes: Vec<TxHash> = rollup_signed.iter().map(|tx| tx.hash).collect();
+        let txs: Vec<Bytes> = rollup_signed.into_iter().map(|tx| tx.encoded).collect();
+        debug!(?txs, ?ru_hashes, "Rollup encoded transactions");
 
         // get the transaction requests for the host
         let host_tx_requests = self.host_txn_requests(&signed_fills).await?;
         debug!(?host_tx_requests, "Host transaction requests");
 
         // sign & encode the host transactions for the Bundle
-        let host_txs = self
+        let host_signed = self
             .sign_and_encode_txns(&self.host_provider, host_tx_requests)
             .await?;
-        debug!(?host_txs, "Host encoded transactions");
+        let host_hashes: Vec<TxHash> = host_signed.iter().map(|tx| tx.hash).collect();
+        let host_txs = host_signed
+            .into_iter()
+            .map(|tx| tx.encoded)
+            .collect::<Vec<_>>();
+        debug!(?host_txs, ?host_hashes, "Host encoded transactions");
 
         // get current rollup block to determine the subsequent target block(s) for Bundle
         let latest_ru_block_number = self.ru_provider.get_block_number().await?;
+        info!(latest_ru_block_number, "latest rollup block number");
 
-        // send the Bundle to the transaction cache
-        // targeting the next 10 blocks to increase chances of mining
-        // NOTE: this is a naive approach; production Fillers should implement more robust bundle resubmission logic
-        for i in 1..11 {
-            self.send_bundle(txs.clone(), host_txs.clone(), latest_ru_block_number + i)
-                .await?;
-        }
+        let target_block_number = latest_ru_block_number + 1;
+        info!(target_block_number, "target rollup block number");
+        self.send_bundle(txs, host_txs, target_block_number).await?;
+
+        self.watch_confirmations(&ru_hashes, &host_hashes).await?;
+        info!(orders_count = orders.len(), "All bundle transactions confirmed");
 
         Ok(())
     }
@@ -194,7 +200,7 @@ where
                 ..Default::default()
             },
         };
-        debug!(?bundle, "bundle contents");
+
         info!(
             ru_tx_count = bundle.bundle.txs.len(),
             host_tx_count = bundle.host_txs.len(),
@@ -315,12 +321,12 @@ where
     /// Given an ordered set of Transaction Requests,
     /// Sign them and encode them for inclusion in a Bundle.
     #[instrument(skip_all)]
-    pub async fn sign_and_encode_txns(
+    async fn sign_and_encode_txns(
         &self,
         provider: &TxSenderProvider,
         tx_requests: Vec<TransactionRequest>,
-    ) -> Result<Vec<Bytes>, Error> {
-        let mut encoded_txs: Vec<Bytes> = Vec::new();
+    ) -> Result<Vec<SignedTx>, Error> {
+        let mut encoded_txs: Vec<SignedTx> = Vec::new();
         for mut tx in tx_requests {
             // fill out the transaction fields
             tx = tx
@@ -337,15 +343,68 @@ where
 
             // encode it
             let encoded = filled.encoded_2718();
+            let tx_hash = *filled.hash();
             info!(
-                tx_hash = filled.hash().to_string(),
+                ?tx_hash,
                 chain_id = provider.get_chain_id().await?,
                 "Transaction signed and encoded"
             );
 
             // add to array
-            encoded_txs.push(Bytes::from(encoded));
+            encoded_txs.push(SignedTx {
+                encoded: Bytes::from(encoded),
+                hash: tx_hash,
+            });
         }
         Ok(encoded_txs)
     }
+
+    async fn watch_confirmations(
+        &self,
+        ru_hashes: &[TxHash],
+        host_hashes: &[TxHash],
+    ) -> Result<(), Error> {
+        let mut watchers = Vec::new();
+
+        for hash in ru_hashes {
+            watchers.push(self.watch_single(&self.ru_provider, *hash, "rollup"));
+        }
+
+        for hash in host_hashes {
+            watchers.push(self.watch_single(&self.host_provider, *hash, "host"));
+        }
+
+        try_join_all(watchers).await?;
+        Ok(())
+    }
+
+    async fn watch_single(
+        &self,
+        provider: &TxSenderProvider,
+        tx_hash: TxHash,
+        chain_label: &'static str,
+    ) -> Result<(), Error> {
+        info!(?tx_hash, chain = chain_label, "Waiting for transaction confirmation");
+
+        let pending = provider
+            .watch_pending_transaction(
+                PendingTransactionConfig::new(tx_hash)
+                    .with_required_confirmations(1)
+                    .with_timeout(Some(Duration::from_secs(300))),
+            )
+            .await?;
+
+        let confirmed_hash = pending
+            .await
+            .map_err(|err| eyre!("failed waiting for {chain_label} tx {tx_hash:?}: {err}"))?;
+
+        info!(?confirmed_hash, chain = chain_label, "Transaction confirmed");
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+struct SignedTx {
+    encoded: Bytes,
+    hash: TxHash,
 }
