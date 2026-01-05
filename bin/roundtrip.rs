@@ -56,7 +56,14 @@ async fn main() -> eyre::Result<()> {
     sleep(Duration::from_secs(1)).await;
 
     // fill the order from the transaction cache
-    fill_orders(&target_signed_order, signer, ru_provider, host_provider, config).await?;
+    fill_orders(
+        &target_signed_order,
+        signer,
+        ru_provider,
+        host_provider,
+        config,
+    )
+    .await?;
     info!("Bundle sent to tx cache successfully; wait for bundle to mine.");
 
     Ok(())
@@ -64,11 +71,7 @@ async fn main() -> eyre::Result<()> {
 
 /// Constructs an example [`Order`] based on the provided configuration and recipient address.
 /// If `rollup` is true, it creates an order that targets the rollup; otherwise, it creates an order that targets the host chain.
-fn new_order(
-    config: &FillerConfig,
-    recipient: Address,
-    rollup: bool,
-) -> UnsignedOrder<'static> {
+fn new_order(config: &FillerConfig, recipient: Address, rollup: bool) -> UnsignedOrder<'static> {
     let unsigned = UnsignedOrder::default()
         .with_input(
             config.constants.rollup().tokens().weth(),

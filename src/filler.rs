@@ -151,7 +151,9 @@ where
         debug!(?tx_requests, "Rollup transaction requests");
 
         // sign & encode the rollup transactions for the Bundle
-        let rollup_signed = self.sign_and_encode_txns(&self.ru_provider, tx_requests).await?;
+        let rollup_signed = self
+            .sign_and_encode_txns(&self.ru_provider, tx_requests)
+            .await?;
         let ru_hashes: Vec<TxHash> = rollup_signed.iter().map(|tx| tx.hash).collect();
         let txs: Vec<Bytes> = rollup_signed.into_iter().map(|tx| tx.encoded).collect();
         debug!(?txs, ?ru_hashes, "Rollup encoded transactions");
@@ -180,7 +182,10 @@ where
         self.send_bundle(txs, host_txs, target_block_number).await?;
 
         self.watch_confirmations(&ru_hashes, &host_hashes).await?;
-        info!(orders_count = orders.len(), "All bundle transactions confirmed");
+        info!(
+            orders_count = orders.len(),
+            "All bundle transactions confirmed"
+        );
 
         Ok(())
     }
@@ -384,7 +389,11 @@ where
         tx_hash: TxHash,
         chain_label: &'static str,
     ) -> Result<(), Error> {
-        info!(?tx_hash, chain = chain_label, "Waiting for transaction confirmation");
+        info!(
+            ?tx_hash,
+            chain = chain_label,
+            "Waiting for transaction confirmation"
+        );
 
         let pending = provider
             .watch_pending_transaction(
@@ -398,7 +407,11 @@ where
             .await
             .map_err(|err| eyre!("failed waiting for {chain_label} tx {tx_hash:?}: {err}"))?;
 
-        info!(?confirmed_hash, chain = chain_label, "Transaction confirmed");
+        info!(
+            ?confirmed_hash,
+            chain = chain_label,
+            "Transaction confirmed"
+        );
         Ok(())
     }
 }
