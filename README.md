@@ -119,7 +119,7 @@ Et voilà! 🎉
 
 ### Troubleshooting
 Signet Bundles target one **specific block number**.
-If a Bundle is not included in that exact block, it won't be “retried” in subsequent blocks.
+If a Bundle is not included in that exact block, it won't be "retried" in subsequent blocks.
 
 The current example script naively sends each Bundle to one single target block. When running the example, if Bundles are not mining, it is possible that they were simply not included in the target block. A naive solution is to simply re-run the script to try submitting a new Bundle. 
 

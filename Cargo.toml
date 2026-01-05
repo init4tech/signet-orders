@@ -1,6 +1,6 @@
 [package]
 name = "signet-orders"
-version = "0.1.0"
+version = "0.2.0"
 description = "signet orders examples"
 edition = "2024"
 rust-version = "1.89"
@@ -27,13 +27,13 @@ path = "bin/submit_transaction.rs"
 [dependencies]
 init4-bin-base = { version = "0.18.0-rc.0", features = ["alloy", "aws"] }
 
-signet-constants =  { version = "0.16.0-rc.1" }
-signet-zenith =  { version = "0.16.0-rc.1" }
-signet-types =  { version = "0.16.0-rc.1" }
-signet-tx-cache =  { version = "0.16.0-rc.1" }
-signet-bundle =  { version = "0.16.0-rc.1" }
+signet-constants =  { version = "0.16.0-rc.2" }
+signet-zenith =  { version = "0.16.0-rc.2" }
+signet-types =  { version = "0.16.0-rc.2" }
+signet-tx-cache =  { version = "0.16.0-rc.2" }
+signet-bundle =  { version = "0.16.0-rc.2" }
 
-alloy = { version = "1.0.35", features = [
+alloy = { version = "1.0.40", features = [
     "full",
     "json-rpc",
     "signer-aws",
