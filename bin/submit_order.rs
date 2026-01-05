@@ -130,7 +130,7 @@ async fn send_order(
 }
 
 /// Fill example [`SignedOrder`]s from the transaction cache.
-#[instrument(skip_all, fields(target_order_signature = %target_order.permit.signature, target_order_owner = %target_order.permit.owner))]
+#[instrument(skip_all, fields(target_order_signature = %target_order.permit().signature, target_order_owner = %target_order.permit().owner))]
 async fn fill_orders(
     target_order: &SignedOrder,
     signer: LocalOrAws,
