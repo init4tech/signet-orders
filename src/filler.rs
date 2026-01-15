@@ -91,7 +91,7 @@ where
     pub async fn get_orders(&self) -> Result<Vec<SignedOrder>, Error> {
         debug!("Querying transaction cache for orders");
         let resp = self.tx_cache.get_orders(None).await?;
-        let orders = resp.into_inner().orders.clone();
+        let orders = resp.into_inner().orders;
         info!(orders_count = orders.len(), "Retrieved orders from cache");
         Ok(orders)
     }
@@ -154,9 +154,16 @@ where
         let rollup_signed = self
             .sign_and_encode_txns(&self.ru_provider, tx_requests)
             .await?;
-        let ru_hashes: Vec<TxHash> = rollup_signed.iter().map(|tx| tx.hash).collect();
-        let txs: Vec<Bytes> = rollup_signed.into_iter().map(|tx| tx.encoded).collect();
-        debug!(?txs, ?ru_hashes, "Rollup encoded transactions");
+
+        let (ru_hashes, txs): (Vec<TxHash>, Vec<Bytes>) = rollup_signed
+            .into_iter()
+            .map(|tx| (tx.hash, tx.encoded))
+            .unzip();
+        debug!(
+            tx_count = txs.len(),
+            ru_hashes_count = ru_hashes.len(),
+            "Rollup encoded transactions"
+        );
 
         // get the transaction requests for the host
         let host_tx_requests = self.host_txn_requests(&signed_fills).await?;
