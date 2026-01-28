@@ -71,8 +71,11 @@ async fn main() -> eyre::Result<()> {
     }
 }
 
-/// Constructs an example [`Order`] based on the provided configuration and recipient address.
-/// If `rollup` is true, it creates an order that targets the rollup; otherwise, it creates an order that targets the host chain.
+/// Constructs an example [`UnsignedOrder`] based on the provided configuration and recipient
+/// address.
+///
+/// If `rollup` is true, it creates an order that targets the rollup; otherwise, it creates an
+/// order that targets the host chain.
 fn get_example_order(
     config: &FillerConfig,
     recipient: Address,
